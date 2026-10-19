@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+data/raw/
+data/cache/
+*.parquet
+.pytest_cache/
+.ruff_cache/
+node_modules/
+dist/
+artifacts/

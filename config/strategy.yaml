@@ -1,0 +1,43 @@
+# Single source of truth for every tunable number in the strategy.
+# A copy is stored with each model run. Change values here, never in code.
+model_weight: 0.30              # weight on model vs the consensus no-vig in the fair-probability blend
+min_consensus_books: 2          # FanDuel/Bovada/Unibet quoting DraftKings' line needed for a consensus
+ev_min: 0.03                    # minimum EV to flag any pick
+ev_min_model_only: 0.05         # minimum EV when there's no consensus
+model_only_shrink: 0.50         # pull model prob this far toward DK implied when no consensus
+hc_prob_min: 0.70               # high-confidence mode probability floor
+kelly_fraction: 0.25            # quarter Kelly
+max_bet_pct: 0.02               # cap per single, fraction of bankroll
+max_parlay_pct: 0.01            # cap per satellite parlay
+max_satellites_per_slate: 2
+max_game_pct: 0.04              # total exposure per game
+max_daily_pct: 0.10             # total exposure per day; stakes scale down proportionally above this
+sgp_ev_haircut: 0.03            # EV subtracted from same-game parlays
+n_sims: 10000
+new_team_low_conf_games: 10
+lineup_poll_start_min: 45
+# Chance a player listed Questionable plays. Neutral starting value: replace it with the rate
+# measured from logged reports and box scores (`python -m nbaprops.pipeline.run play-rates`).
+p_play_questionable: 0.50
+# Don't price a game whose DraftKings odds are older than this (plan: freshness check), and
+# drop a consensus book that hasn't answered within it.
+max_odds_age_min: 120
+# Approved strategy: the core singles are high-confidence picks. Standard flags (EV >= 3% but
+# below hc_prob_min) are still logged, at zero stake, so their CLV and hit rate are tracked;
+# set true to stake them too.
+stake_standard_flags: false
+# Teammates of a key Questionable player (projected as a blend of "he plays" / "he sits"):
+#   robust  - flag only if the bet is +EV in BOTH outcomes (and the blend clears ev_min)
+#   mixture - judge the blend alone
+#   block   - never flag them (the most conservative; costs the most volume)
+questionable_teammates: robust
+# After go-live: real stakes at ramp_factor x the engine's for the first ramp_bets real bets,
+# then full stakes if real-money CLV holds (plan, Stage 9).
+ramp_bets: 200
+ramp_factor: 0.5
+# Storage on free database tiers (~0.5 GB): the candidate log keeps main lines and milestones
+# with EV at or above this (tuning needs props near the threshold, not far below it), plus
+# anything flagged; and health checks alert at 80% of the database size limit.
+candidate_log_min_ev: -0.05
+db_size_limit_mb: 500
+markets: [pts, reb, ast, fg3m, pra]

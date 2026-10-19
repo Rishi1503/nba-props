@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nba
+          POSTGRES_PASSWORD: nba
+          POSTGRES_DB: nbaprops
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nba -d nbaprops"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://nba:nba@localhost:5432/nbaprops
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync --all-extras --locked
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Migrate
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+      - name: Test
+        run: uv run pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install (exact, from the lockfile)
+        run: npm ci --no-audit --no-fund
+      - name: Build (strict templates)
+        run: npx ng build
+      - name: Unit tests
+        run: npx ng test --watch=false

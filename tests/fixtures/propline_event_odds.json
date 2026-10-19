@@ -1,0 +1,85 @@
+{
+  "id": 90001,
+  "sport_key": "basketball_nba",
+  "home_team": "Detroit Pistons",
+  "away_team": "Boston Celtics",
+  "commence_time": "2026-10-20T19:00:00Z",
+  "bookmakers": [
+    {
+      "key": "draftkings",
+      "title": "DraftKings",
+      "markets": [
+        {"key": "player_points", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Over", "description": "Cade Cunningham", "point": 26.5, "price": -115, "player_id": "nba:1630595", "side": null},
+          {"name": "Under", "description": "Cade Cunningham", "point": 26.5, "price": -105, "player_id": "nba:1630595", "side": null},
+          {"name": "Over", "description": "Jaylen Brown (BOS)", "point": 24.5, "price": -110, "player_id": "nba:1627759", "side": null},
+          {"name": "Under", "description": "Jaylen Brown (BOS)", "point": 24.5, "price": -110, "player_id": "nba:1627759", "side": null}
+        ]},
+        {"key": "player_points", "line_type": "alternate", "team": null, "period": null, "outcomes": [
+          {"name": "Over", "description": "Cade Cunningham", "point": 29.5, "price": 160, "player_id": "nba:1630595", "side": null},
+          {"name": "Under", "description": "Cade Cunningham", "point": 29.5, "price": -210, "player_id": "nba:1630595", "side": null}
+        ]},
+        {"key": "player_points", "line_type": "milestone", "team": null, "period": null, "outcomes": [
+          {"name": "Cade Cunningham", "description": "Cade Cunningham", "point": 20, "price": -400, "player_id": "nba:1630595", "side": null}
+        ]},
+        {"key": "player_rebounds", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Over", "description": "Jalen Duren", "point": 10.5, "price": -120, "player_id": "nba:1631105", "side": null},
+          {"name": "Under", "description": "Jalen Duren", "point": 10.5, "price": -110, "player_id": "nba:1631105", "side": null},
+          {"name": "Over", "description": "Rookie Unknownson", "point": 3.5, "price": -105, "player_id": null, "side": null},
+          {"name": "Under", "description": "Rookie Unknownson", "point": 3.5, "price": -125, "player_id": null, "side": null}
+        ]},
+        {"key": "player_steals", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Over", "description": "Jalen Duren", "point": 0.5, "price": 120, "player_id": "nba:1631105", "side": null}
+        ]},
+        {"key": "spreads", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Detroit Pistons", "point": -2.5, "price": -110, "side": "home"},
+          {"name": "Boston Celtics", "point": 2.5, "price": -110, "side": "away"}
+        ]},
+        {"key": "totals", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Over", "point": 224.5, "price": -108, "side": null},
+          {"name": "Under", "point": 224.5, "price": -112, "side": null}
+        ]},
+        {"key": "totals", "line_type": "main", "team": "Detroit Pistons", "period": null, "outcomes": [
+          {"name": "Over", "point": 113.5, "price": -110, "side": "home"},
+          {"name": "Under", "point": 113.5, "price": -110, "side": "home"}
+        ]}
+      ]
+    },
+    {
+      "key": "fanduel",
+      "title": "FanDuel",
+      "markets": [
+        {"key": "player_points", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Over", "description": "Cade Cunningham", "point": 26.5, "price": -122, "player_id": "nba:1630595", "side": null},
+          {"name": "Under", "description": "Cade Cunningham", "point": 26.5, "price": -104, "player_id": "nba:1630595", "side": null}
+        ]},
+        {"key": "player_points", "line_type": "main", "team": null, "period": "q1", "outcomes": [
+          {"name": "Over", "description": "Cade Cunningham", "point": 7.5, "price": -110, "player_id": "nba:1630595", "side": null},
+          {"name": "Under", "description": "Cade Cunningham", "point": 7.5, "price": -110, "player_id": "nba:1630595", "side": null}
+        ]}
+      ]
+    },
+    {
+      "key": "pinnacle",
+      "title": "Pinnacle",
+      "markets": [
+        {"key": "h2h", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Detroit Pistons", "price": -135, "side": "home"},
+          {"name": "Boston Celtics", "price": 122, "side": "away"}
+        ]},
+        {"key": "spreads", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Detroit Pistons", "point": -3.0, "price": -104, "side": "home"},
+          {"name": "Boston Celtics", "point": 3.0, "price": -106, "side": "away"}
+        ]},
+        {"key": "spreads", "line_type": "alternate", "team": null, "period": null, "outcomes": [
+          {"name": "Detroit Pistons", "point": -6.5, "price": 160, "side": "home"},
+          {"name": "Boston Celtics", "point": 6.5, "price": -190, "side": "away"}
+        ]},
+        {"key": "totals", "line_type": "main", "team": null, "period": null, "outcomes": [
+          {"name": "Over", "point": 223.5, "price": -103, "side": null},
+          {"name": "Under", "point": 223.5, "price": -107, "side": null}
+        ]}
+      ]
+    }
+  ]
+}

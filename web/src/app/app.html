@@ -1,0 +1,13 @@
+<main>
+  <router-outlet />
+</main>
+@if (auth.loggedIn()) {
+  <nav class="tabs-bar" aria-label="Pages">
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Board</a>
+    <a routerLink="/bets" routerLinkActive="active">Bets</a>
+    <a routerLink="/performance" routerLinkActive="active">Results</a>
+    <a routerLink="/backtests" routerLinkActive="active">Models</a>
+    <a routerLink="/status" routerLinkActive="active">Status</a>
+    <button class="link" (click)="logout()">Log out</button>
+  </nav>
+}

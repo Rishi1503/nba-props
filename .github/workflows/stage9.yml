@@ -1,0 +1,53 @@
+name: Weekly review and monthly recalibration
+
+# Sunday 11:30 PM EDT (Monday 03:30 UTC): weekly review, market shut-off rule, go-live status.
+# 1st of the month, 14:30 UTC: refit the live calibration layer on recent results.
+on:
+  schedule:
+    - cron: "30 3 * * 1"
+    - cron: "30 14 1 * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "review | golive | recalibrate"
+        default: "review"
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  stage9:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked --extra model
+      - run: uv run alembic upgrade head
+      - name: Run
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CMD="${{ github.event.inputs.command }}"
+          elif [ "${{ github.event.schedule }}" = "30 14 1 * *" ]; then
+            CMD=recalibrate
+          else
+            CMD=review
+          fi
+          case "$CMD" in review|golive|recalibrate) ;; *) echo "bad command"; exit 1;; esac
+          uv run python -m nbaprops.ops.run "$CMD"
+      - name: Keep the review report
+        if: always() && hashFiles('reports/review/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-${{ github.run_id }}
+          path: reports/review/
+          retention-days: 365

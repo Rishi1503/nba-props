@@ -1,0 +1,32 @@
+name: Weekly retrain (challenger)
+
+# Mondays 13:30 UTC (9:30 AM EDT / 8:30 AM EST), after Sunday night's box scores are in.
+# The new model is stored as a challenger: it projects in shadow and never prices picks
+# until the champion-challenger check promotes it (plan, Stage 11).
+on:
+  schedule:
+    - cron: "30 13 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: collect # never alongside the production cycle
+  cancel-in-progress: false
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked --extra model
+      - run: uv run alembic upgrade head
+      - run: uv run python -m nbaprops.ops.run retrain
