@@ -64,6 +64,20 @@ def _endpoint(name: str):
     }[name]
 
 
+def _normalized(endpoint_obj) -> dict:
+    """{data set name: list of row dicts} for both response formats. nba_api's
+    get_normalized_dict() only reads the older "resultSets" format and returns {} for the
+    V3 endpoints (BoxScoreTraditionalV3), which its own per-endpoint parser handles."""
+    data = endpoint_obj.get_normalized_dict()
+    if data:
+        return data
+    sets = endpoint_obj.nba_response.get_data_sets(endpoint_obj.endpoint)
+    return {
+        name: [dict(zip(ds["headers"], row, strict=True)) for row in ds["data"]]
+        for name, ds in sets.items()
+    }
+
+
 class StatsFetcher:
     """Calls nba_api with retries and pauses, caching each response as gzipped JSON."""
 
@@ -87,12 +101,16 @@ class StatsFetcher:
         path = self.cache_dir / endpoint / f"{cache_key}.json.gz"
         if cache and not self.refresh and path.exists():
             with gzip.open(path, "rt") as f:
-                return json.load(f)
+                cached = json.load(f)
+            if cached:  # an empty cached response is a failed fetch: get it again
+                return cached
         cls = _endpoint(endpoint)
         last_error: Exception | None = None
         for attempt in range(self.retries):
             try:
-                data = cls(**params, timeout=self.timeout).get_normalized_dict()
+                data = _normalized(cls(**params, timeout=self.timeout))
+                if not data:
+                    raise ValueError("empty response")
                 break
             except Exception as exc:  # timeouts, connection resets, bad JSON from the site
                 last_error = exc
