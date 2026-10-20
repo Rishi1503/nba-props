@@ -27,7 +27,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select, text, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -134,20 +134,37 @@ class StatsFetcher:
 # --- Small parsers -----------------------------------------------------------
 
 
+class BadMinutes(ValueError):
+    """A minutes value the site sent garbled (seen: "12:0-57"). Not the same as zero."""
+
+
 def parse_minutes(value: Any) -> float | None:
-    """Accepts 34.57, "34:12", "PT34M12.00S", "" / None (did not play)."""
+    """Accepts 34.57, "34:12", "PT34M12.00S", "" / None (did not play). Raises BadMinutes on
+    anything else: callers decide, because "unreadable" must never be read as "didn't play"."""
     if value is None or value == "":
         return None
     if isinstance(value, int | float):
         return float(value)
     s = str(value).strip()
-    if s.startswith("PT"):
-        mins, _, secs = s[2:].rstrip("S").partition("M")
-        return float(mins or 0) + float(secs or 0) / 60
-    if ":" in s:
-        mins, secs = s.split(":", 1)
-        return int(mins) + int(float(secs)) / 60
-    return float(s)
+    try:
+        if s.startswith("PT"):
+            mins, _, secs = s[2:].rstrip("S").partition("M")
+            return float(mins or 0) + float(secs or 0) / 60
+        if ":" in s:
+            mins, secs = s.split(":", 1)
+            return int(mins) + int(float(secs)) / 60
+        return float(s)
+    except ValueError as exc:
+        raise BadMinutes(f"unreadable minutes {value!r}") from exc
+
+
+def minutes_or_unknown(value: Any, where: str) -> float | None:
+    """Game logs: an unreadable value becomes unknown (empty), with a warning."""
+    try:
+        return parse_minutes(value)
+    except BadMinutes as exc:
+        log.warning("%s: %s; recording minutes as unknown", where, exc)
+        return None
 
 
 def parse_game_date(value: str) -> date:
@@ -248,7 +265,7 @@ def player_logs_to_rows(player_rows: Rows) -> tuple[Rows, dict[int, str]]:
                 "team_id": r["TEAM_ID"],
                 "dnp": False,
                 "started": None,  # unknown until the box score is loaded
-                "minutes": parse_minutes(r["MIN"]),
+                "minutes": minutes_or_unknown(r["MIN"], f"game {r['GAME_ID']}"),
                 "pts": _int(r["PTS"]),
                 "reb": _int(r["REB"]),
                 "oreb": _int(r["OREB"]),
@@ -280,7 +297,13 @@ def boxscore_to_updates(box_rows: Rows) -> tuple[dict[int, bool], Rows, dict[int
     for r in box_rows:
         pid = r["personId"]
         names[pid] = f"{r.get('firstName', '')} {r.get('familyName', '')}".strip()
-        mins = parse_minutes(r.get("minutes"))
+        try:
+            mins = parse_minutes(r.get("minutes"))
+        except BadMinutes as exc:
+            # Something is there, so he played; his minutes come from the game logs anyway.
+            log.warning("game %s, player %s: %s; treating as played", r["gameId"], pid, exc)
+            started[pid] = bool((r.get("position") or "").strip())
+            continue
         if not mins:
             dnp_rows.append(
                 {
@@ -567,11 +590,14 @@ MAX_FAILURES_IN_A_ROW = 5
 COOL_DOWN_SEC = 120
 
 
+class SiteBlocked(RuntimeError):
+    """The stats site refused MAX_FAILURES_IN_A_ROW requests in a row."""
+
+
 @dataclass
 class BoxscoreRun:
     loaded: int = 0
     failed: list[str] = field(default_factory=list)  # refused or timed out: worth retrying
-    stopped: bool = False  # gave up after MAX_FAILURES_IN_A_ROW: the site is blocking us
 
 
 def load_boxscores(fetch: Fetch, game_ids: list[str]) -> BoxscoreRun:
@@ -591,12 +617,10 @@ def load_boxscores(fetch: Fetch, game_ids: list[str]) -> BoxscoreRun:
             in_a_row += 1
             if in_a_row >= MAX_FAILURES_IN_A_ROW:
                 log.error(
-                    "%d box scores failed in a row; the stats site is refusing requests. "
-                    "Stopping: run the backfill again later to continue.",
+                    "%d box scores failed in a row; the stats site is refusing requests",
                     in_a_row,
                 )
-                run.stopped = True
-                break
+                raise SiteBlocked(f"{in_a_row} box scores failed in a row") from exc
             log.warning("skipping %s for now (%s); pausing %ds", game_id, exc, COOL_DOWN_SEC)
             time.sleep(COOL_DOWN_SEC)
             continue
@@ -680,19 +704,35 @@ MAX_BLOCK_WAITS = 8  # about four hours of waiting before giving up
 CATCH_UP_ROUNDS = 3
 
 
+def _boxscores_loaded(seasons: list[str]) -> int:
+    with session_scope() as s:
+        return (
+            s.scalar(
+                select(func.count())
+                .select_from(Game)
+                .where(Game.season.in_(seasons), Game.boxscore_loaded.is_(True))
+            )
+            or 0
+        )
+
+
 def backfill_resilient(
     fetch: Fetch, seasons: list[str], boxscores: bool = True, sleep=time.sleep
 ) -> dict[str, list[str]]:
     """Backfill unattended. The stats site blocks for a while every few hundred requests:
-    when any request fails all its retries, wait the block out and resume the same season
-    (what's loaded is cached or marked loaded, so a resumed season only does what's left).
-    A last pass retries box scores skipped along the way. Returns issues per season."""
+    when it does, wait the block out and resume the same season (what's loaded is cached or
+    marked loaded, so a resumed season only does what's left). Gives up only after
+    MAX_BLOCK_WAITS waits in a row with no progress between them. A last pass retries box
+    scores skipped along the way. Returns issues per season."""
     results: dict[str, list[str]] = {}
     waits = 0
+    progress = (0, _boxscores_loaded(seasons))
 
     def wait_out_block(reason: str) -> None:
-        nonlocal waits
-        waits += 1
+        nonlocal waits, progress
+        now = (len(results), _boxscores_loaded(seasons))
+        waits = 1 if now != progress else waits + 1  # progress since the last wait resets it
+        progress = now
         if waits > MAX_BLOCK_WAITS:
             raise RuntimeError(
                 f"The stats site kept refusing requests ({reason}). Everything loaded so far "
@@ -700,7 +740,7 @@ def backfill_resilient(
             )
         log.warning(
             "stats site is refusing requests (%s): waiting %d minutes, then resuming "
-            "(wait %d of %d)",
+            "(wait %d of %d without progress)",
             reason,
             BLOCK_WAIT_SEC // 60,
             waits,
@@ -725,7 +765,8 @@ def backfill_resilient(
         queue.pop(0)
     if not boxscores:
         return results
-    for _ in range(CATCH_UP_ROUNDS):
+    rounds = 0
+    while rounds < CATCH_UP_ROUNDS:
         with session_scope() as s:
             missing = s.scalars(
                 select(Game.game_id).where(
@@ -737,9 +778,12 @@ def backfill_resilient(
         if not missing:
             break
         log.info("catch-up: %d box scores still missing", len(missing))
-        run = load_boxscores(fetch, list(missing))
+        try:
+            run = load_boxscores(fetch, list(missing))
+        except SiteBlocked as exc:
+            wait_out_block(str(exc))  # a block doesn't use up a round
+            continue
+        rounds += 1
         if not run.failed:
             break  # what's left came back empty from the site: the daily job keeps retrying
-        if run.stopped:
-            wait_out_block("box scores")
     return results

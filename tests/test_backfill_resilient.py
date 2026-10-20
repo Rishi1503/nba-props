@@ -108,3 +108,66 @@ def test_a_player_without_a_name_gets_a_placeholder(stats_db):  # noqa: F811
     with session_scope() as s:
         assert s.get(Player, 196294096).full_name == "Player 196294096"
         assert s.get(Player, 196294097).full_name == "Player 196294097"
+
+
+@pytest.mark.db
+def test_a_block_during_box_scores_resumes_the_same_season(stats_db, monkeypatch):  # noqa: F811
+    """2022-23 stopped ~700 box scores short when the site blocked: the season must be
+    resumed after the wait, not left to the end-of-run catch-up."""
+    monkeypatch.setattr(stats.time, "sleep", lambda s: None)
+    monkeypatch.setattr(stats, "MAX_FAILURES_IN_A_ROW", 1)
+    fetch, blocked, waits = FakeFetch(), [1], []
+
+    def site(endpoint, key, cache=True, **params):
+        if endpoint == "boxscoretraditionalv3" and blocked[0]:
+            blocked[0] -= 1
+            raise RuntimeError(f"{endpoint} {key} failed after 4 tries")
+        return fetch(endpoint, key, cache=cache, **params)
+
+    stats.backfill_resilient(site, ["2025-26"], sleep=waits.append)
+    assert waits == [stats.BLOCK_WAIT_SEC]
+    assert _loaded()["0022500001"] is True
+
+
+@pytest.mark.db
+def test_waits_with_progress_between_them_dont_count_toward_the_limit(
+    stats_db,  # noqa: F811
+    monkeypatch,
+):
+    """A healthy multi-season run blocks every ~700 requests: only waits in a row with
+    nothing loaded between them count toward giving up."""
+    monkeypatch.setattr(stats.time, "sleep", lambda s: None)
+    monkeypatch.setattr(stats, "MAX_FAILURES_IN_A_ROW", 1)
+    monkeypatch.setattr(stats, "MAX_BLOCK_WAITS", 1)
+    fetch, waits = FakeFetch(), []
+    fail = {"leaguegamelog": 1, "0022500002": 1}
+
+    def site(endpoint, key, cache=True, **params):
+        k = endpoint if endpoint == "leaguegamelog" else key
+        if fail.get(k):
+            fail[k] -= 1
+            raise RuntimeError(f"{endpoint} {key} failed after 4 tries")
+        return fetch(endpoint, key, cache=cache, **params)
+
+    stats.backfill_resilient(site, ["2025-26"], sleep=waits.append)  # doesn't give up
+    assert waits == [stats.BLOCK_WAIT_SEC] * 2  # game 1 loaded between the two blocks
+    assert _loaded()["0022500001"] is True
+
+
+def test_garbled_minutes_are_never_read_as_zero():
+    with pytest.raises(stats.BadMinutes):
+        stats.parse_minutes("12:0-57")
+    assert stats.parse_minutes("PT34M12.00S") == pytest.approx(34.2)
+    row = {
+        "personId": 7,
+        "firstName": "A",
+        "familyName": "B",
+        "gameId": "g",
+        "teamId": 1,
+        "position": "",
+        "comment": "",
+        "minutes": "12:0-57",
+    }
+    started, dnp, _ = stats.boxscore_to_updates([row])
+    assert started == {7: False} and dnp == []  # played (off the bench), not DNP
+    assert stats.minutes_or_unknown("12:0-57", "game g") is None  # game logs: unknown
