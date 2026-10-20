@@ -22,6 +22,7 @@ import random
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -538,20 +539,27 @@ MAX_FAILURES_IN_A_ROW = 5
 COOL_DOWN_SEC = 120
 
 
-def load_boxscores(fetch: Fetch, game_ids: list[str]) -> int:
+@dataclass
+class BoxscoreRun:
+    loaded: int = 0
+    failed: list[str] = field(default_factory=list)  # refused or timed out: worth retrying
+    stopped: bool = False  # gave up after MAX_FAILURES_IN_A_ROW: the site is blocking us
+
+
+def load_boxscores(fetch: Fetch, game_ids: list[str]) -> BoxscoreRun:
     """One request per game not yet loaded; commits per game so a crash loses nothing."""
     with session_scope() as s:
         pending = s.scalars(
             select(Game.game_id).where(Game.game_id.in_(game_ids), Game.boxscore_loaded.is_(False))
         ).all()
-    loaded, failed, in_a_row = 0, [], 0
+    run, in_a_row = BoxscoreRun(), 0
     for i, game_id in enumerate(sorted(pending), 1):
         try:
             rows = fetch("boxscoretraditionalv3", game_id, game_id=game_id)["PlayerStats"]
         except RuntimeError as exc:
             # The stats site throttles long runs: skip this game (it stays unloaded, so the
             # next run retries it), let the site cool down, and carry on.
-            failed.append(game_id)
+            run.failed.append(game_id)
             in_a_row += 1
             if in_a_row >= MAX_FAILURES_IN_A_ROW:
                 log.error(
@@ -559,6 +567,7 @@ def load_boxscores(fetch: Fetch, game_ids: list[str]) -> int:
                     "Stopping: run the backfill again later to continue.",
                     in_a_row,
                 )
+                run.stopped = True
                 break
             log.warning("skipping %s for now (%s); pausing %ds", game_id, exc, COOL_DOWN_SEC)
             time.sleep(COOL_DOWN_SEC)
@@ -570,16 +579,16 @@ def load_boxscores(fetch: Fetch, game_ids: list[str]) -> int:
             continue
         with session_scope() as s:
             apply_boxscore(s, game_id, rows)
-        loaded += 1
+        run.loaded += 1
         if i % 100 == 0:
             log.info("box scores: %d / %d", i, len(pending))
-    if failed:
+    if run.failed:
         log.warning(
             "%d box scores not loaded yet (run the backfill again to retry): %s",
-            len(failed),
-            ", ".join(failed[:20]),
+            len(run.failed),
+            ", ".join(run.failed[:20]),
         )
-    return loaded
+    return run
 
 
 def backfill_season(fetch: Fetch, season: str, boxscores: bool = True) -> list[str]:
@@ -636,3 +645,73 @@ def yesterday_et(now: datetime) -> date:
     from zoneinfo import ZoneInfo
 
     return (now.astimezone(ZoneInfo("America/New_York")) - timedelta(days=1)).date()
+
+
+BLOCK_WAIT_SEC = 30 * 60  # how long the stats site's blocks have lasted
+MAX_BLOCK_WAITS = 8  # about four hours of waiting before giving up
+CATCH_UP_ROUNDS = 3
+
+
+def backfill_resilient(
+    fetch: Fetch, seasons: list[str], boxscores: bool = True, sleep=time.sleep
+) -> dict[str, list[str]]:
+    """Backfill unattended. The stats site blocks for a while every few hundred requests:
+    when any request fails all its retries, wait the block out and resume the same season
+    (what's loaded is cached or marked loaded, so a resumed season only does what's left).
+    A last pass retries box scores skipped along the way. Returns issues per season."""
+    results: dict[str, list[str]] = {}
+    waits = 0
+
+    def wait_out_block(reason: str) -> None:
+        nonlocal waits
+        waits += 1
+        if waits > MAX_BLOCK_WAITS:
+            raise RuntimeError(
+                f"The stats site kept refusing requests ({reason}). Everything loaded so far "
+                "is saved: run the backfill again later to continue."
+            )
+        log.warning(
+            "stats site is refusing requests (%s): waiting %d minutes, then resuming "
+            "(wait %d of %d)",
+            reason,
+            BLOCK_WAIT_SEC // 60,
+            waits,
+            MAX_BLOCK_WAITS,
+        )
+        sleep(BLOCK_WAIT_SEC)
+
+    queue = list(seasons)
+    while queue:
+        season = queue[0]
+        try:
+            results[season] = backfill_season(fetch, season, boxscores=boxscores)
+        except RuntimeError as exc:
+            wait_out_block(str(exc))
+            continue
+        log.info(
+            "%s done: %d validation issues, %d requests so far",
+            season,
+            len(results[season]),
+            getattr(fetch, "requests_made", 0),
+        )
+        queue.pop(0)
+    if not boxscores:
+        return results
+    for _ in range(CATCH_UP_ROUNDS):
+        with session_scope() as s:
+            missing = s.scalars(
+                select(Game.game_id).where(
+                    Game.season.in_(seasons),
+                    Game.status == "final",
+                    Game.boxscore_loaded.is_(False),
+                )
+            ).all()
+        if not missing:
+            break
+        log.info("catch-up: %d box scores still missing", len(missing))
+        run = load_boxscores(fetch, list(missing))
+        if not run.failed:
+            break  # what's left came back empty from the site: the daily job keeps retrying
+        if run.stopped:
+            wait_out_block("box scores")
+    return results

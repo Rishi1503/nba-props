@@ -230,14 +230,7 @@ def main(argv: list[str] | None = None) -> None:
         fetch = stats.StatsFetcher(pause=args.pause, refresh=args.refresh)
         with session_scope() as s:
             reference.seed_teams(s)
-        for season in args.seasons:
-            issues = stats.backfill_season(fetch, season, boxscores=not args.no_boxscores)
-            log.info(
-                "%s done: %d validation issues, %d requests so far",
-                season,
-                len(issues),
-                fetch.requests_made,
-            )
+        stats.backfill_resilient(fetch, args.seasons, boxscores=not args.no_boxscores)
     elif args.cmd == "aliases":
         from nbaprops.db.models import UnmatchedName
 
