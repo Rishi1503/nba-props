@@ -492,8 +492,15 @@ def nba_only(games: Rows, team_logs: Rows, player_rows: Rows, known: set[int]):
     return (
         [g for g in games if g["game_id"] in keep],
         [r for r in team_logs if r["game_id"] in keep],
-        [r for r in player_rows if r["game_id"] in keep],
+        [r for r in player_rows if r["game_id"] in keep and r.get("team_id", 0) in known],
     )
+
+
+def names_in(player_rows: Rows, names: dict[int, str]) -> dict[int, str]:
+    """Only the players who still have rows: a touring club's players are dropped with their
+    games, and must not be registered as players either."""
+    kept = {r["player_id"] for r in player_rows}
+    return {pid: n for pid, n in names.items() if pid in kept}
 
 
 def load_period(
@@ -539,6 +546,7 @@ def load_period(
     with session_scope() as s:
         known = set(s.scalars(select(Team.team_id)).all())
     games, team_logs, player_rows = nba_only(games, team_logs, player_rows, known)
+    names = names_in(player_rows, names)
     issues += validate(team_logs, player_rows)
     game_ids = [g["game_id"] for g in games]
     with session_scope() as s:

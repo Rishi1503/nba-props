@@ -82,11 +82,29 @@ def test_preseason_games_against_non_nba_teams_are_skipped():
         {"game_id": "g2", "team_id": club},
     ]
     players = [
-        {"game_id": "g1", "player_id": 1},
-        {"game_id": "g2", "player_id": 1},
-        {"game_id": "g2", "player_id": 2},
+        {"game_id": "g1", "player_id": 1, "team_id": bos},
+        {"game_id": "g1", "player_id": 9, "team_id": club},  # a club guest in g1
+        {"game_id": "g2", "player_id": 1, "team_id": bos},
+        {"game_id": "g2", "player_id": 2, "team_id": club},
     ]
     g, t, p = stats.nba_only(games, team_logs, players, known={bos, nyk})
     assert [x["game_id"] for x in g] == ["g1"]
     assert {x["game_id"] for x in t} == {"g1"} and len(t) == 2
     assert [x["game_id"] for x in p] == ["g1"]
+    assert [x["player_id"] for x in p] == [1]  # the club guest is dropped too
+    # ... and only players who still have rows get registered as players
+    names = {1: "Jayson Tatum", 2: None, 9: "Club Guest"}
+    assert stats.names_in(p, names) == {1: "Jayson Tatum"}
+
+
+@pytest.mark.db
+def test_a_player_without_a_name_gets_a_placeholder(stats_db):  # noqa: F811
+    from nbaprops.db.models import Player
+    from nbaprops.pipeline.reference import ensure_player
+
+    with session_scope() as s:
+        ensure_player(s, 196294096, None)
+        ensure_player(s, 196294097, "  ")
+    with session_scope() as s:
+        assert s.get(Player, 196294096).full_name == "Player 196294096"
+        assert s.get(Player, 196294097).full_name == "Player 196294097"

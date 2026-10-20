@@ -75,7 +75,13 @@ def ensure_player(session: Session, player_id: int, name: str) -> None:
     """Insert a placeholder player row for ids the static list doesn't know yet (rookies)."""
     session.execute(
         insert(Player)
-        .values(player_id=player_id, full_name=name, is_active=True)
+        # a nameless row gets a placeholder (filled in later from box scores or the roster
+        # refresh) rather than stopping a long backfill
+        .values(
+            player_id=player_id,
+            full_name=(name or "").strip() or f"Player {player_id}",
+            is_active=True,
+        )
         .on_conflict_do_nothing()
     )
 
