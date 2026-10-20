@@ -534,24 +534,52 @@ def load_period(
     return game_ids, issues
 
 
+MAX_FAILURES_IN_A_ROW = 5
+COOL_DOWN_SEC = 120
+
+
 def load_boxscores(fetch: Fetch, game_ids: list[str]) -> int:
     """One request per game not yet loaded; commits per game so a crash loses nothing."""
     with session_scope() as s:
         pending = s.scalars(
             select(Game.game_id).where(Game.game_id.in_(game_ids), Game.boxscore_loaded.is_(False))
         ).all()
-    empty = 0
+    loaded, failed, in_a_row = 0, [], 0
     for i, game_id in enumerate(sorted(pending), 1):
-        rows = fetch("boxscoretraditionalv3", game_id, game_id=game_id)["PlayerStats"]
+        try:
+            rows = fetch("boxscoretraditionalv3", game_id, game_id=game_id)["PlayerStats"]
+        except RuntimeError as exc:
+            # The stats site throttles long runs: skip this game (it stays unloaded, so the
+            # next run retries it), let the site cool down, and carry on.
+            failed.append(game_id)
+            in_a_row += 1
+            if in_a_row >= MAX_FAILURES_IN_A_ROW:
+                log.error(
+                    "%d box scores failed in a row; the stats site is refusing requests. "
+                    "Stopping: run the backfill again later to continue.",
+                    in_a_row,
+                )
+                break
+            log.warning("skipping %s for now (%s); pausing %ds", game_id, exc, COOL_DOWN_SEC)
+            time.sleep(COOL_DOWN_SEC)
+            continue
+        in_a_row = 0
         if not rows:
-            empty += 1  # leave boxscore_loaded false so the next run retries it
+            # leave boxscore_loaded false so the next run retries it
             log.warning("box score for %s came back empty; will retry next run", game_id)
             continue
         with session_scope() as s:
             apply_boxscore(s, game_id, rows)
+        loaded += 1
         if i % 100 == 0:
             log.info("box scores: %d / %d", i, len(pending))
-    return len(pending) - empty
+    if failed:
+        log.warning(
+            "%d box scores not loaded yet (run the backfill again to retry): %s",
+            len(failed),
+            ", ".join(failed[:20]),
+        )
+    return loaded
 
 
 def backfill_season(fetch: Fetch, season: str, boxscores: bool = True) -> list[str]:
