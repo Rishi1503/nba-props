@@ -65,3 +65,28 @@ def test_a_site_that_never_comes_back_ends_the_run(stats_db, monkeypatch):  # no
     with pytest.raises(RuntimeError, match="run the backfill again later"):
         stats.backfill_resilient(refused, ["2025-26"], sleep=waits.append)
     assert waits == [stats.BLOCK_WAIT_SEC] * 2
+
+
+def test_preseason_games_against_non_nba_teams_are_skipped():
+    """2022-23's preseason had games against touring clubs (team 50009): they and all their
+    rows are dropped before loading, instead of breaking the games table's team rule."""
+    bos, nyk, club = 1610612738, 1610612752, 50009
+    games = [
+        {"game_id": "g1", "home_team_id": bos, "away_team_id": nyk},
+        {"game_id": "g2", "home_team_id": bos, "away_team_id": club},
+    ]
+    team_logs = [
+        {"game_id": "g1", "team_id": bos},
+        {"game_id": "g1", "team_id": nyk},
+        {"game_id": "g2", "team_id": bos},
+        {"game_id": "g2", "team_id": club},
+    ]
+    players = [
+        {"game_id": "g1", "player_id": 1},
+        {"game_id": "g2", "player_id": 1},
+        {"game_id": "g2", "player_id": 2},
+    ]
+    g, t, p = stats.nba_only(games, team_logs, players, known={bos, nyk})
+    assert [x["game_id"] for x in g] == ["g1"]
+    assert {x["game_id"] for x in t} == {"g1"} and len(t) == 2
+    assert [x["game_id"] for x in p] == ["g1"]

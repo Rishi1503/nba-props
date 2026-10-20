@@ -32,7 +32,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from nbaprops.db.base import session_scope
-from nbaprops.db.models import Game, Player, PlayerGameLog, TeamGameLog
+from nbaprops.db.models import Game, Player, PlayerGameLog, Team, TeamGameLog
 from nbaprops.pipeline.reference import ensure_player
 from nbaprops.pipeline.schedule import season_from_game_id
 
@@ -479,6 +479,23 @@ def update_players_from_index(session: Session, index_rows: Rows, set_team: bool
 # --- Orchestration -----------------------------------------------------------
 
 
+def nba_only(games: Rows, team_logs: Rows, player_rows: Rows, known: set[int]):
+    """Drop games involving teams that aren't NBA teams (preseason games against touring
+    international clubs, e.g. team 50009), with all their team and player rows: they aren't
+    modeled, and their teams aren't in `teams`."""
+    keep = {
+        g["game_id"] for g in games if g["home_team_id"] in known and g["away_team_id"] in known
+    }
+    dropped = len(games) - len(keep)
+    if dropped:
+        log.info("skipped %d games against non-NBA teams", dropped)
+    return (
+        [g for g in games if g["game_id"] in keep],
+        [r for r in team_logs if r["game_id"] in keep],
+        [r for r in player_rows if r["game_id"] in keep],
+    )
+
+
 def load_period(
     fetch: Fetch,
     season: str,
@@ -519,6 +536,9 @@ def load_period(
 
     games, team_logs, issues = team_logs_to_rows(teams, season_type)
     player_rows, names = player_logs_to_rows(players)
+    with session_scope() as s:
+        known = set(s.scalars(select(Team.team_id)).all())
+    games, team_logs, player_rows = nba_only(games, team_logs, player_rows, known)
     issues += validate(team_logs, player_rows)
     game_ids = [g["game_id"] for g in games]
     with session_scope() as s:
