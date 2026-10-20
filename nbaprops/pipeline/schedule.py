@@ -78,6 +78,19 @@ def fetch_schedule(timeout: float = 30.0) -> dict[str, Any]:
 def upsert_games(session: Session, rows: list[dict[str, Any]]) -> int:
     """Insert new games; update tip time, status, and date on existing ones (reschedules).
     Teams must already be seeded (see reference.seed_teams)."""
+    # Skip games against teams that aren't in `teams` (preseason exhibitions vs
+    # international clubs, e.g. team 50015): not modeled, and they'd break the foreign key.
+    import logging as _logging
+
+    from sqlalchemy import text as _text
+
+    _known = set(session.execute(_text("SELECT team_id FROM teams")).scalars())
+    _skip = [r for r in rows if r["home_team_id"] not in _known or r["away_team_id"] not in _known]
+    if _skip:
+        _logging.getLogger(__name__).info(
+            "schedule: skipped %d games with non-NBA teams", len(_skip)
+        )
+    rows = [r for r in rows if r not in _skip]
     if not rows:
         return 0
     stmt = insert(Game).values(rows)
