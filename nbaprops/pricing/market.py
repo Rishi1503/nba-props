@@ -15,7 +15,7 @@ import pandas as pd
 from nbaprops.pricing.odds_math import devig_two_way
 
 TARGET_BOOK = "draftkings"
-CONSENSUS_BOOKS = ("fanduel", "bovada", "unibet")
+CONSENSUS_BOOKS = ("fanduel", "bovada", "unibet", "pinnacle")
 PROP_COLS = ["game_id", "book", "player_id", "market", "line_type"]
 
 
