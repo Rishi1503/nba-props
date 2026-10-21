@@ -117,3 +117,26 @@ def test_failed_markets_are_switched_off_at_import():
     assert RUN in rows["pra"][1] and "live evidence" in rows["pra"][1]
     with session_scope() as s:  # a bundle without holdout notes (a weekly retrain) changes nothing
         assert bundles.switch_off_failed_markets(s, SimpleNamespace(meta={}), now) == []
+
+
+@pytest.mark.db
+def test_bankroll_is_recorded_under_the_new_york_date(monkeypatch):
+    """At 9:30 PM in New York it is already tomorrow in UTC (the database's clock): the
+    bankroll must be dated today in New York, or that night's slate can't find it."""
+    from datetime import date
+
+    from nbaprops.db.models import BankrollEntry
+    from nbaprops.ops import run as ops_run
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 22, 1, 30, tzinfo=UTC).astimezone(tz)
+
+    with session_scope() as s:
+        s.execute(delete(BankrollEntry))
+    monkeypatch.setattr(ops_run, "datetime", Clock)
+    ops_run.main(["bankroll", "1000"])
+    with session_scope() as s:
+        rows = [(r.entry_date, float(r.bankroll)) for r in s.query(BankrollEntry).all()]
+    assert rows == [(date(2026, 10, 21), 1000.0)]

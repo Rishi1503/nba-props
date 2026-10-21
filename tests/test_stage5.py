@@ -321,6 +321,23 @@ def test_projections_stored_under_a_registered_run(league, tmp_path):
         pj.store_projections(s, bundle.run_id, proj)
     with session_scope() as s:
         assert s.scalar(select(func.count()).select_from(Projection)) == n
+    # Re-projecting one game after a player is ruled out replaces that game's rows: his old
+    # projection must not linger (pricing would skip the game for "injury news after it").
+    from nbaprops.db.models import PlayerAlias
+
+    out = int(proj["player_id"].iloc[0])
+    game = proj.loc[proj["player_id"] == out, "game_id"].iloc[0]
+    rest = proj[(proj["game_id"] == game) & (proj["player_id"] != out)]
+    with session_scope() as s:
+        pj.store_projections(s, bundle.run_id, rest)
+    with session_scope() as s:
+        left = set(s.scalars(select(Projection.player_id).where(Projection.game_id == game)))
+        assert out not in left and left == set(rest["player_id"].astype(int))
+        others = s.scalar(
+            select(func.count()).select_from(Projection).where(Projection.game_id != game)
+        )
+        assert others == int((proj["game_id"] != game).sum())  # other games untouched
+        assert s.get(PlayerAlias, "player") is None  # no alias from a placeholder name
 
 
 def test_command_line_evaluate_and_train(league, tmp_path):

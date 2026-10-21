@@ -13,6 +13,7 @@ tune           retune the blend weight and EV floor on paper data (a report; nev
 recalibrate    monthly: fit the live calibration layer on recent results
 place          record a real bet: place PICK_ID --price -110 --stake 20
 market         switch a market off or back on: market pts --off "reason" / market pts --on
+bankroll       record the bankroll as of today (New York date): bankroll 1000 [--note "..."]
 note-fix       record a manual fix (resets the go-live pipeline streak): note-fix "what"
 """
 
@@ -53,6 +54,9 @@ def main(argv: list[str] | None = None) -> None:
     pl.add_argument("pick_id", type=int)
     pl.add_argument("--price", type=int, required=True)
     pl.add_argument("--stake", type=float, required=True)
+    bk = sub.add_parser("bankroll")
+    bk.add_argument("amount", type=float)
+    bk.add_argument("--note", default="bankroll")
     mk = sub.add_parser("market")
     mk.add_argument("market", choices=["pts", "reb", "ast", "fg3m", "pra"])
     onoff = mk.add_mutually_exclusive_group(required=True)
@@ -124,7 +128,16 @@ def main(argv: list[str] | None = None) -> None:
             ).one()
             print(f"today ({today}): {n[0]} picks, {float(n[1]):.2f} staked")
 
-    elif args.cmd in ("review", "golive", "tune", "recalibrate", "place", "market", "note-fix"):
+    elif args.cmd in (
+        "review",
+        "golive",
+        "tune",
+        "recalibrate",
+        "place",
+        "market",
+        "note-fix",
+        "bankroll",
+    ):
         stage9(args, now, today, cfg, notifier)
 
 
@@ -168,6 +181,26 @@ def stage9(args, now, today, cfg, notifier) -> None:
         elif args.cmd == "place":
             real = place(s, args.pick_id, args.price, args.stake, now)
             print(f"recorded real bet {real.pick_id}: {args.stake:.2f} at {args.price:+d}")
+        elif args.cmd == "bankroll":
+            from decimal import Decimal
+            from zoneinfo import ZoneInfo
+
+            from nbaprops.db.models import BankrollEntry
+
+            # The New York date, the slate calendar: the database's own clock is UTC, which
+            # is already tomorrow after 8 PM in New York.
+            day = datetime.now(UTC).astimezone(ZoneInfo("America/New_York")).date()
+            s.merge(
+                BankrollEntry(
+                    entry_date=day,
+                    bankroll=Decimal(f"{args.amount:.2f}"),
+                    deposits=0,
+                    withdrawals=0,
+                    settled_pnl=0,
+                    note=args.note,
+                )
+            )
+            print(f"bankroll {args.amount:,.2f} recorded for {day} (New York date)")
         elif args.cmd == "market":
             row = s.get(MarketControl, args.market) or MarketControl(market=args.market)
             row.disabled, row.reason, row.changed_ts = bool(args.off), args.off, now

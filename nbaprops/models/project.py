@@ -462,6 +462,7 @@ def project_frame(
 
 
 def store_projections(session, run_id: str, projections: pd.DataFrame) -> int:
+    from sqlalchemy import delete
     from sqlalchemy.dialects.postgresql import insert
 
     from nbaprops.db.models import Projection
@@ -469,8 +470,14 @@ def store_projections(session, run_id: str, projections: pd.DataFrame) -> int:
 
     if not len(projections):
         return 0
+    # A projection run replaces each game's set: a player ruled out since the last run must
+    # not keep his old row (pricing would see injury news "after" it and skip the game).
+    games = [str(g) for g in projections["game_id"].unique()]
+    session.execute(
+        delete(Projection).where(Projection.run_id == run_id, Projection.game_id.in_(games))
+    )
     for pid in projections["player_id"].unique():
-        ensure_player(session, int(pid), f"player {pid}")
+        ensure_player(session, int(pid), "")  # no made-up name: it would become an alias
     recs = [{**r, "run_id": run_id} for r in projections.to_dict("records")]
     stmt = insert(Projection).values(recs)
     session.execute(
