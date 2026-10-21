@@ -482,6 +482,10 @@ def update_players_from_index(session: Session, index_rows: Rows, set_team: bool
     now = datetime.now(UTC)
     n = 0
     for r in index_rows:
+        # Rookies and new signings join the table here, before their first game: otherwise
+        # the injury report and DraftKings can't be matched to them until they've played.
+        first, last = r.get("PLAYER_FIRST_NAME") or "", r.get("PLAYER_LAST_NAME") or ""
+        ensure_player(session, int(r["PERSON_ID"]), f"{first} {last}".strip())
         values = {}
         if r.get("POSITION"):
             values["position"] = r["POSITION"][:8]

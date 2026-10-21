@@ -171,3 +171,29 @@ def test_garbled_minutes_are_never_read_as_zero():
     started, dnp, _ = stats.boxscore_to_updates([row])
     assert started == {7: False} and dnp == []  # played (off the bench), not DNP
     assert stats.minutes_or_unknown("12:0-57", "game g") is None  # game logs: unknown
+
+
+@pytest.mark.db
+def test_the_roster_refresh_adds_players_not_yet_in_the_table(stats_db):  # noqa: F811
+    """Rookies and new signings come in from the player index before their first game, so the
+    injury report and DraftKings can be matched to them."""
+    from nbaprops.db.models import Player
+
+    was = 1610612764
+    with session_scope() as s:
+        stats.update_players_from_index(
+            s,
+            [
+                {
+                    "PERSON_ID": 1642900,
+                    "PLAYER_FIRST_NAME": "AJ",
+                    "PLAYER_LAST_NAME": "Dybantsa",
+                    "TEAM_ID": was,
+                    "POSITION": "F",
+                },
+            ],
+            set_team=True,
+        )
+    with session_scope() as s:
+        p = s.get(Player, 1642900)
+        assert (p.full_name, p.current_team_id, p.position) == ("AJ Dybantsa", was, "F")

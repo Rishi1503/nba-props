@@ -42,6 +42,20 @@ _REASON_STARTS = (
     "Concussion Protocol",
 )
 _TEAM_NAMES = sorted((t["full_name"] for t in static_teams.get_teams()), key=len, reverse=True)
+# The report's own spellings, where they differ from the reference data.
+_TEAM_ALIASES = {"LA Clippers": "Los Angeles Clippers"}
+# Every way a team's cell can start a line -> its full name. The 2026-27 report's text
+# extracts with the spaces squashed out of team names ("Philadelphia76ers"), so each name is
+# also matched without spaces. Longest first, so "Los Angeles Clippers" wins over shorter forms.
+_TEAM_FORMS = sorted(
+    {
+        form: full
+        for name, full in [(n, n) for n in _TEAM_NAMES] + list(_TEAM_ALIASES.items())
+        for form in (name, name.replace(" ", ""))
+    }.items(),
+    key=lambda kv: len(kv[0]),
+    reverse=True,
+)
 _TEAM_BY_NAME = {t["full_name"]: t["id"] for t in static_teams.get_teams()}
 _TEAM_BY_ABBR = {t["abbreviation"]: t["id"] for t in static_teams.get_teams()}
 
@@ -107,10 +121,10 @@ def parse_report_text(text: str) -> list[InjuryRow]:
         if m := _MATCHUP.match(line):
             away, home = m.group(1), m.group(2)
             line = line[m.end() :]
-        for name in _TEAM_NAMES:
-            if line.startswith(name):
-                team = name
-                line = line[len(name) :].strip()
+        for form, full in _TEAM_FORMS:
+            if line.startswith(form):
+                team = full
+                line = line[len(form) :].strip()
                 break
         if not line or line.startswith("NOT YET SUBMITTED"):
             continue

@@ -248,3 +248,29 @@ def test_pulled_markets_are_skipped_and_reported(event_odds):
     assert not [q for q in parse_props(payload) if q.market == "ast"]
     assert pulled_players(payload) == {("draftkings", 1630595, "Cade Cunningham")}
     assert pulled_players(event_odds) == set()
+
+
+def test_the_2026_report_format_with_squashed_team_names():
+    """The 2026-27 report's text squashes the spaces out of team names (and after the comma in
+    player names). Every row must still get its team, and no team name may stick to a player."""
+    text = "\n".join(
+        [
+            "Injury Report: 10/21/26 05:00 PM",
+            "Page 1 of 3",
+            "Game Date Game Time Matchup Team Player Name Current Status Reason",
+            "10/21/2026 07:00 (ET) PHI@MIN Philadelphia76ers Barlow,Dominick Out G League-Two-Way",
+            "Embiid,Joel Questionable Injury/Illness-LeftKnee;Soreness",
+            "MinnesotaTimberwolves DiVincenzo,Donte Out Injury/Illness-RightToe;Sprain",
+            "10/21/2026 10:30 (ET) LAC@SAC LAClippers Harden,James Probable Rest",
+            "LA Clippers Leonard,Kawhi Out Injury/Illness-RightKnee;Soreness",
+        ]
+    )
+    rows = injuries.parse_report_text(text)
+    got = [(r.team_name, r.player_name, r.status) for r in rows]
+    assert got == [
+        ("Philadelphia 76ers", "Barlow,Dominick", "Out"),
+        ("Philadelphia 76ers", "Embiid,Joel", "Questionable"),
+        ("Minnesota Timberwolves", "DiVincenzo,Donte", "Out"),
+        ("Los Angeles Clippers", "Harden,James", "Probable"),
+        ("Los Angeles Clippers", "Leonard,Kawhi", "Out"),
+    ]
