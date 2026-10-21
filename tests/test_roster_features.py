@@ -443,10 +443,14 @@ def test_gate_requires_a_significant_gain():
 
 
 def test_with_without_and_trade_inputs_reach_the_rate_models():
-    from nbaprops.models import rates
+    from nbaprops.models import minutes, rates
 
-    for c in ("wo_pts_pm_delta", "stint_pts_pm_l10", "arrived_usage_sum", "opp_absent_min_sum"):
+    for c in ("wo_pts_pm_delta", "stint_pts_pm_l10", "departed_usage_sum", "opp_absent_min_sum"):
         assert c in rates.FEATURE_COLUMNS
+    # Teammate sums over "who played" are computed but kept out of every model: training
+    # could only count players who actually played, live everyone expected to.
+    for c in fb.NOT_MODEL_INPUTS:
+        assert c not in rates.FEATURE_COLUMNS and c not in minutes.FEATURES
 
 
 # --- daily roster refresh ----------------------------------------------------------

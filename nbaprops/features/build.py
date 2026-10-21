@@ -121,10 +121,6 @@ FEATURE_COLUMNS = [
     # roster changes around the player (weighted, fading as recent form absorbs them)
     "departed_min_sum",
     "departed_usage_sum",
-    "arrived_min_sum",
-    "arrived_usage_sum",
-    "returning_min_sum",
-    "returning_usage_sum",
     # this player with vs without today's most important absent teammate
     "wo_games",
     "wo_min_delta",
@@ -175,6 +171,17 @@ FEATURE_COLUMNS = [
 ]
 # Outcomes, never inputs. y_team_margin / y_game_total let Stage 5 estimate how blowouts and
 # scoring environments move minutes and stats.
+# Computed and kept in the frame (tests, backtest breakdowns) but NOT model inputs. They sum
+# over the teammates in the frame: in training that is who actually played (known only after
+# the game), live it is everyone expected to; the two can't be made to mean the same thing,
+# and the gap pushed live projections down. A player's own arrival and return inputs stay.
+NOT_MODEL_INPUTS = [
+    "arrived_min_sum",
+    "arrived_usage_sum",
+    "returning_min_sum",
+    "returning_usage_sum",
+]
+
 TARGET_COLUMNS = [
     "y_minutes",
     "y_pts",
@@ -246,6 +253,34 @@ def _asof(left: pd.DataFrame, right: pd.DataFrame, by: str | list, right_by=None
 # --- state tables (one row per entity per game, *after* that game) ------------
 
 
+CAREER_SEASONS = 3  # career_games counts this season and the two before it
+
+
+def recent_career_games(p: pd.DataFrame) -> np.ndarray:
+    """Games played through each row, counting only this season and the previous
+    CAREER_SEASONS - 1. A count over every loaded season grows with the database itself (a
+    2026 veteran had twice the "career" of a 2023 one), so the model would read the passage
+    of time as experience. `p`: played logs sorted by player and date, with `season`."""
+    cum = p.groupby("player_id", sort=False).cumcount().to_numpy() + 1
+    year = p["season"].str[:4].astype(int).to_numpy()
+    ends = (
+        pd.DataFrame({"player_id": p["player_id"].to_numpy(), "key": year, "before": cum})
+        .groupby(["player_id", "key"], as_index=False)["before"]
+        .max()
+        .sort_values("key")
+    )
+    left = pd.DataFrame(
+        {
+            "player_id": p["player_id"].to_numpy(),
+            "key": year - CAREER_SEASONS,
+            "i": np.arange(len(p)),
+        }
+    ).sort_values("key")
+    m = pd.merge_asof(left, ends, on="key", by="player_id", direction="backward")
+    before = m.sort_values("i")["before"].fillna(0).to_numpy()
+    return (cum - before).astype(int)
+
+
 def player_state(
     logs: pd.DataFrame, team_logs: pd.DataFrame, games: pd.DataFrame | None = None
 ) -> pd.DataFrame:
@@ -297,7 +332,7 @@ def player_state(
     out["started_share_l10"] = (
         g["started_f"].rolling(10, min_periods=1).mean().reset_index(level=0, drop=True)
     )
-    out["career_games"] = g.cumcount() + 1
+    out["career_games"] = recent_career_games(p)
     gs = p.groupby(["player_id", "season"], sort=False)
     out["std_games"] = gs.cumcount() + 1
     cums = gs[["minutes", *STATS]].cumsum()
@@ -557,6 +592,32 @@ def season_priors(logs: pd.DataFrame, players: pd.DataFrame) -> tuple[pd.DataFra
 # --- teammates ---------------------------------------------------------------
 
 
+INACTIVE_REASON_WORDS = (
+    "dnd",
+    "nwt",
+    "inactive",
+    "not with team",
+    "injur",
+    "illness",
+    "suspen",
+    "league",
+    "personal",
+    "rest",
+)
+
+
+def healthy_scratches(logs: pd.DataFrame) -> pd.DataFrame:
+    """Box-score rows of players who were available but didn't play: a did-not-play row whose
+    reason is a coach's decision (or blank), not injury, illness, suspension, G League,
+    personal reasons or rest (those players would have been on the injury report)."""
+    if "dnp_reason" not in logs:
+        return logs.iloc[0:0][["game_id", "team_id", "player_id"]]
+    d = logs[logs["dnp"].fillna(False).astype(bool)]
+    reason = d["dnp_reason"].fillna("").str.lower()
+    inactive = reason.apply(lambda r: any(w in r for w in INACTIVE_REASON_WORDS))
+    return d.loc[~inactive, ["game_id", "team_id", "player_id"]]
+
+
 def team_absences(
     logs: pd.DataFrame,
     team_logs: pd.DataFrame,
@@ -617,6 +678,13 @@ def team_absences(
     for gid, rows in by_game.items():
         for pid, team, *_ in rows:
             played_for[(gid, team)].add(pid)
+    # Who was AVAILABLE: everyone who played, plus healthy scratches (a coach's decision).
+    # Absence must mean what can be known before tip-off, as the injury report says live
+    # (Out/Doubtful); a benching is only known after the game, so training on it leaked
+    # (live projections ran minutes low, most of all on opening night).
+    available_for = defaultdict(set, {k: set(v) for k, v in played_for.items()})
+    for r in healthy_scratches(logs).itertuples(index=False):
+        available_for[(r.game_id, r.team_id)].add(r.player_id)
 
     summary, rotation_rows = [], []
     for tg in team_games.itertuples(index=False):
@@ -651,7 +719,7 @@ def team_absences(
             pd_dates, pd_teams, pd_seasons = player_dates.get(pid, ([], [], []))
             i = bisect_left(pd_dates, tg.game_date)
             gone = bool(i) and pd_teams[i - 1] != tg.team_id  # has played elsewhere since
-            if not gone and finished and pid not in played_for[(tg.game_id, tg.team_id)]:
+            if not gone and finished and pid not in available_for[(tg.game_id, tg.team_id)]:
                 # Next game elsewhere *this season* (a trade). An offseason move is not a
                 # departure: a player injured for the rest of the season is absent, not gone.
                 gone = (
@@ -673,7 +741,7 @@ def team_absences(
                 starts / n_known if n_known else 0.0,
             )
         if finished:
-            absent = {p for p in rotation if p not in played_for[(tg.game_id, tg.team_id)]}
+            absent = {p for p in rotation if p not in available_for[(tg.game_id, tg.team_id)]}
         else:
             absent = {p for p in rotation if p in status_map.get((tg.game_id, tg.team_id), set())}
         by_pos: dict[str, float] = defaultdict(float)
@@ -1150,7 +1218,7 @@ def assemble(
     keep = [c for c in keep if c in t.columns]
     ys = [c for c in TARGET_COLUMNS if c in t.columns]
     return (
-        t[keep + FEATURE_COLUMNS + ys]
+        t[keep + FEATURE_COLUMNS + [c for c in NOT_MODEL_INPUTS if c in t.columns] + ys]
         .sort_values(["game_date", "game_id", "player_id"])
         .reset_index(drop=True)
     )

@@ -341,3 +341,95 @@ def test_live_inputs_load_the_same_history_as_training(monkeypatch):
     assert scenarios == features == fb.history_seasons("2026-27")
     assert scenarios[0] == "2021-22" and scenarios[-1] == "2026-27"
     assert set(training) - set(scenarios) <= {"2020-21"}  # training's extra prior season is empty
+
+
+def _absence_case(finished: bool):
+    """Team 1's rotation over five games: A 30 min, B 20, C 15. Game 6: A plays, B is a
+    coach's-decision scratch, C is inactive (not in the box score)."""
+    days = pd.date_range("2025-11-01", periods=6, freq="2D")
+    logs, team_logs = [], []
+    for i, d in enumerate(days, 1):
+        gid = f"g{i}"
+        team_logs.append({"team_id": 1, "game_id": gid, "game_date": d, "season": "2025-26"})
+        if i == 6 and not finished:
+            continue
+        for pid, mins in ((1, 30.0), (2, 20.0), (3, 15.0)):
+            row = {
+                "game_id": gid,
+                "player_id": pid,
+                "team_id": 1,
+                "minutes": mins,
+                "usage_pct": 0.2,
+                "started": pid == 1,
+                "dnp": False,
+                "dnp_reason": None,
+                "game_date": d,
+                "season": "2025-26",
+                "season_type": "regular",
+            }
+            if i == 6 and pid == 2:
+                row.update(minutes=0.0, dnp=True, dnp_reason="DNP - Coach's Decision")
+            if i == 6 and pid == 3:
+                continue  # inactive: not in the box score
+            logs.append(row)
+    players = pd.DataFrame({"player_id": [1, 2, 3], "pos": ["G", "F", "C"]})
+    tg = pd.DataFrame([{"game_id": "g6", "team_id": 1, "game_date": days[-1], "season": "2025-26"}])
+    statuses = (
+        None
+        if finished
+        else pd.DataFrame([{"game_id": "g6", "team_id": 1, "player_id": 3, "status": "Out"}])
+    )
+    summary, _ = fb.team_absences(
+        pd.DataFrame(logs), pd.DataFrame(team_logs), players, tg, statuses
+    )
+    return summary.iloc[0]
+
+
+def test_a_coachs_decision_is_not_an_absence_and_training_matches_live():
+    """Training used to count healthy scratches as absent (known only after the game), so
+    live, where only the injury report is known, never matched it."""
+    train, live = _absence_case(finished=True), _absence_case(finished=False)
+    assert (train["absent_n"], train["absent_min_sum"]) == (1, 15.0)  # C only, not B
+    for c in ("absent_n", "absent_min_sum", "absent_usage_sum", "absent_starters"):
+        assert train[c] == live[c], c
+
+
+def test_healthy_scratch_reasons():
+    logs = pd.DataFrame(
+        {
+            "game_id": "g",
+            "team_id": 1,
+            "player_id": range(8),
+            "dnp": True,
+            "dnp_reason": [
+                "DNP - Coach's Decision",
+                None,
+                "DND - Injury/Illness",
+                "NWT - Personal",
+                "Inactive - G League - Two-Way",
+                "DND - Rest",
+                "DNP - Suspension",
+                "Inactive - Injury/Illness",
+            ],
+        }
+    )
+    assert sorted(fb.healthy_scratches(logs)["player_id"]) == [0, 1]
+
+
+def test_career_games_count_only_the_last_three_seasons():
+    p = pd.DataFrame(
+        {
+            "player_id": [1] * 6 + [2] * 2,
+            "season": [
+                "2021-22",
+                "2021-22",
+                "2022-23",
+                "2023-24",
+                "2024-25",
+                "2025-26",
+                "2024-25",
+                "2025-26",
+            ],
+        }
+    )
+    assert list(fb.recent_career_games(p)) == [1, 2, 3, 4, 3, 3, 1, 2]

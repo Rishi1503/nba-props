@@ -89,7 +89,13 @@ def test_production_from_the_holdout_never_evaluates_it_again(tmp_path, monkeypa
     s = seen["settings"]  # the recorded run's settings, so its cached models are reused
     assert (s.retrain_days, s.n_sims, s.first_train_season) == (7, 2000, "2022-23")
     meta = json.loads((tmp_path / out["bundle"] / "meta.json").read_text())
-    assert meta["holdout"] == {"run_id": RUN, "passed": ["pts", "reb"], "failed": ["pra"]}
+    assert meta["holdout"] == {
+        "run_id": RUN,
+        "passed": ["pts", "reb"],
+        "failed": ["pra"],
+        "clean": True,
+        "accepted_rerun": None,
+    }
 
 
 def test_no_market_passing_means_no_production_model(tmp_path, monkeypatch):
@@ -140,3 +146,40 @@ def test_bankroll_is_recorded_under_the_new_york_date(monkeypatch):
     with session_scope() as s:
         rows = [(r.entry_date, float(r.bankroll)) for r in s.query(BankrollEntry).all()]
     assert rows == [(date(2026, 10, 21), 1000.0)]
+
+
+def test_a_rerun_needs_an_explicit_recorded_acceptance(tmp_path, monkeypatch):
+    """After the absence-leakage fix the holdout had to be evaluated again: that rerun can
+    only become production with --accept-rerun, and the reason travels with the model."""
+    reports = recorded(tmp_path, {"pts": True, "pra": False})
+    report = {
+        "run_id": "bt-rerun",
+        "settings": SETTINGS,
+        "layer_a": {
+            "targets": {
+                "passes": True,
+                "markets": {"pts": {"passes": True}, "reb": {"passes": True}},
+            }
+        },
+    }
+    (reports / "backtest" / "bt-rerun.json").write_text(json.dumps(report))
+    with pytest.raises(SystemExit, match="--accept-rerun"):
+        run.holdout_verdict("bt-rerun", reports)
+    monkeypatch.chdir(tmp_path)
+    fake_training(monkeypatch, {})
+    why = "rerun after the absence-leakage fix"
+    out = run.main(
+        [
+            "--season",
+            "2025-26",
+            "--from-holdout",
+            "bt-rerun",
+            "--accept-rerun",
+            why,
+            "--reports",
+            str(reports),
+        ]
+    )
+    meta = json.loads((tmp_path / out["bundle"] / "meta.json").read_text())
+    assert meta["holdout"]["clean"] is False and meta["holdout"]["accepted_rerun"] == why
+    assert meta["holdout"]["passed"] == ["pts", "reb"]

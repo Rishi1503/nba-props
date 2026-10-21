@@ -152,7 +152,9 @@ def production_bundle(
     return Bundle(run_id, minutes_model, rate_model, scenario, cal, meta)
 
 
-def holdout_verdict(run_id: str, reports: Path = REPORTS) -> tuple[dict[str, bool], dict]:
+def holdout_verdict(
+    run_id: str, reports: Path = REPORTS, accept_rerun: str | None = None
+) -> tuple[dict[str, bool], dict]:
     """Per-market pass/fail from the recorded, clean evaluation of the holdout season, and
     that run's report. Nothing is recomputed: the verdict is the one already on record."""
     entry = next(
@@ -160,8 +162,11 @@ def holdout_verdict(run_id: str, reports: Path = REPORTS) -> tuple[dict[str, boo
     )
     if entry is None or entry["season"] != HOLDOUT_SEASON:
         raise SystemExit(f"{run_id} isn't a recorded evaluation of the {HOLDOUT_SEASON} holdout")
-    if not entry["clean"]:
-        raise SystemExit(f"{run_id} was a rerun, not a clean holdout evaluation")
+    if not entry["clean"] and not accept_rerun:
+        raise SystemExit(
+            f"{run_id} was a rerun, not a clean holdout evaluation. To build production from "
+            'it anyway, pass --accept-rerun "<why>": the reason is recorded in the model.'
+        )
     report = json.loads((reports / "backtest" / f"{run_id}.json").read_text())
     markets = report["layer_a"]["targets"]["markets"]
     return {m: bool(v["passes"]) for m, v in markets.items()}, report
@@ -174,6 +179,7 @@ def save_production(
     verdict: dict[str, bool],
     holdout_run: str,
     models_dir: Path = Path("artifacts/models"),
+    accepted_rerun: str | None = None,
 ) -> Path:
     """The production bundle, recording which markets passed the holdout. Markets that failed
     are switched off when it is imported as champion; none passing means no bundle."""
@@ -182,7 +188,13 @@ def save_production(
     if not passed:
         raise SystemExit("No market passed the holdout: no production model.")
     bundle = production_bundle(df, oos, f"prod-{datetime.now(UTC):%Y%m%d%H%M}", first_train_season)
-    bundle.meta["holdout"] = {"run_id": holdout_run, "passed": passed, "failed": failed}
+    bundle.meta["holdout"] = {
+        "run_id": holdout_run,
+        "passed": passed,
+        "failed": failed,
+        "clean": accepted_rerun is None,
+        "accepted_rerun": accepted_rerun,  # why a not-clean evaluation was accepted, if it was
+    }
     folder = models_dir / bundle.run_id
     bundle.save(folder)
     print(f"Production bundle: {folder}")
@@ -193,7 +205,7 @@ def save_production(
 
 
 def production_from_holdout(args) -> dict:
-    verdict, report = holdout_verdict(args.from_holdout, args.reports)
+    verdict, report = holdout_verdict(args.from_holdout, args.reports, args.accept_rerun)
     s = report["settings"]  # the same settings, so the walk-forward reuses its cached models
     df = load_frame(HOLDOUT_SEASON, args.features)
     settings = wf.Settings(
@@ -205,7 +217,14 @@ def production_from_holdout(args) -> dict:
     )
     target, warm = wf.run(df, HOLDOUT_SEASON, settings)
     oos = pd.concat([x.lines for x in (warm, target) if x is not None], ignore_index=True)
-    folder = save_production(df, oos, s["first_train_season"], verdict, args.from_holdout)
+    folder = save_production(
+        df,
+        oos,
+        s["first_train_season"],
+        verdict,
+        args.from_holdout,
+        accepted_rerun=args.accept_rerun,
+    )
     return {"bundle": str(folder), "verdict": verdict}
 
 
@@ -371,6 +390,11 @@ def main(argv: list[str] | None = None) -> dict:
     )
     ap.add_argument("--rerun-holdout", metavar="REASON")
     ap.add_argument("--from-holdout", metavar="RUN_ID")
+    ap.add_argument(
+        "--accept-rerun",
+        metavar="REASON",
+        help="build production from a not-clean holdout rerun (recorded)",
+    )
     ap.add_argument("--cache", type=Path, default=Path("artifacts/backtest_cache"))
     ap.add_argument("--reports", type=Path, default=REPORTS)
     args = ap.parse_args(argv)
@@ -452,14 +476,22 @@ def main(argv: list[str] | None = None) -> dict:
     print(render_markdown(report))
     print(f"Report: {path}")
     if args.production:
-        if args.season != HOLDOUT_SEASON or not clean:
+        if args.season != HOLDOUT_SEASON or (not clean and not args.accept_rerun):
             raise SystemExit(
                 "Production retrain needs a clean holdout evaluation (season "
-                f"{HOLDOUT_SEASON}); the report above was still written."
+                f'{HOLDOUT_SEASON}), or --accept-rerun "<why>" for a rerun; the report '
+                "above was still written."
             )
         verdict = {m: bool(v["passes"]) for m, v in report["layer_a"]["targets"]["markets"].items()}
         oos = pd.concat([x.lines for x in (warm, target) if x is not None], ignore_index=True)
-        save_production(df, oos, args.first_train_season, verdict, run_id)
+        save_production(
+            df,
+            oos,
+            args.first_train_season,
+            verdict,
+            run_id,
+            accepted_rerun=None if clean else args.accept_rerun,
+        )
     return report
 
 
