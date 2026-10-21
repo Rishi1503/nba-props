@@ -75,3 +75,23 @@ def stored_challengers(session) -> list[str]:
             .order_by(ModelRun.created_ts)
         )
     )
+
+
+def switch_off_failed_markets(session, bundle: Bundle, now) -> list[str]:
+    """Markets this bundle failed on the holdout are switched off (pricing skips them); turn
+    one back on with `market X --on` only after live evidence that it is calibrated."""
+    from nbaprops.db.models import MarketControl
+
+    holdout = bundle.meta.get("holdout") or {}
+    for m in holdout.get("failed", []):
+        session.merge(
+            MarketControl(
+                market=m,
+                disabled=True,
+                changed_ts=now,
+                reason=f"failed the holdout evaluation ({holdout.get('run_id')}); "
+                "turn back on only after live evidence it is calibrated",
+            )
+        )
+    session.flush()
+    return list(holdout.get("failed", []))

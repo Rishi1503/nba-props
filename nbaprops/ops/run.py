@@ -101,7 +101,14 @@ def main(argv: list[str] | None = None) -> None:
         bundle = Bundle.load(args.path)
         with session_scope() as s:
             bundles.save(s, bundle, champion=args.champion)
+            off = (
+                bundles.switch_off_failed_markets(s, bundle, datetime.now(UTC))
+                if args.champion
+                else []
+            )
         print(f"stored {bundle.run_id}" + (" as champion" if args.champion else ""))
+        if off:
+            print(f"switched off (failed the holdout): {', '.join(off)}")
     elif args.cmd == "promote":
         with session_scope() as s:
             bundles.promote(s, args.run_id)

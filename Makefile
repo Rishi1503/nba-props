@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-holdout backtest-layer-b price cycle settle retrain status import-champion review golive tune recalibrate api web demo e2e
+.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout review golive tune recalibrate api web demo e2e
 
 setup:
 	uv sync --all-extras --locked
@@ -97,6 +97,11 @@ status:
 # Store the production bundle from `make backtest-holdout` as the champion: BUNDLE=artifacts/models/prod-...
 import-champion:
 	uv run python -m nbaprops.ops.run import-bundle $(BUNDLE) --champion
+
+# Build the production bundle from the recorded holdout run, without re-evaluating it:
+# make production-from-holdout RUN=bt-2025-26-...
+production-from-holdout:
+	uv run python -m nbaprops.backtest.run --season 2025-26 --from-holdout $(RUN)
 
 # Stage 9: paper trading and go-live
 review:
