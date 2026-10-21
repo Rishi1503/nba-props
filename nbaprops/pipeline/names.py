@@ -35,6 +35,19 @@ def normalize_name(name: str) -> str:
     return " ".join(tokens)
 
 
+def compact_forms(key: str) -> list[str]:
+    """Fallback match keys for names whose spaces were squashed out ("Dereck LivelyII",
+    "YanicKonan Niederhauser"): the normalized key without spaces, then without a generational
+    suffix glued to its end ("derecklivelyii" -> "derecklively")."""
+    c = key.replace(" ", "")
+    forms = [c]
+    for suf in ("iii", "ii", "iv", "jr", "sr"):
+        if c.endswith(suf) and len(c) > len(suf) + 3:
+            forms.append(c[: -len(suf)])
+            break
+    return forms
+
+
 def parse_provider_player_id(raw: str | None) -> int | None:
     """PropLine player ids look like "nba:1628369" (the NBA personId). Others -> None."""
     if not raw or not raw.startswith("nba:"):

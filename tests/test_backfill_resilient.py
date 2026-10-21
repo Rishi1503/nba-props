@@ -197,3 +197,63 @@ def test_the_roster_refresh_adds_players_not_yet_in_the_table(stats_db):  # noqa
     with session_scope() as s:
         p = s.get(Player, 1642900)
         assert (p.full_name, p.current_team_id, p.position) == ("AJ Dybantsa", was, "F")
+
+
+def test_compact_forms_for_squashed_names():
+    from nbaprops.pipeline.names import compact_forms
+
+    assert compact_forms("dereck livelyii") == ["derecklivelyii", "derecklively"]
+    assert compact_forms("yanickonan niederhauser") == ["yanickonanniederhauser"]
+
+
+@pytest.mark.db
+def test_squashed_report_names_match_their_players(stats_db):  # noqa: F811
+    """The 2026-27 report squashes spaces inside names ("LivelyII,Dereck",
+    "Niederhauser,YanicKonan"). Invented names, so the seeded real roster can't interfere
+    (against it, "LivelyII,Dereck" resolves to the real Dereck Lively II, 1641726)."""
+    from nbaprops.db.models import Player
+    from nbaprops.pipeline.names import last_first_to_first_last
+    from nbaprops.pipeline.reference import ensure_player, resolve_player_by_name
+
+    with session_scope() as s:
+        for pid, name in (
+            (9001, "Zedd Quillon II"),
+            (9002, "Orvo Thrask III"),
+            (9003, "Yannick Konaz Velderhaus"),
+            (9004, "Marqus Zmithe"),
+            (9005, "Mar Qus Zmithe"),
+        ):
+            ensure_player(s, pid, name)
+        s.add(Player(player_id=9006, full_name="Bennick Simzor", is_active=False))  # no alias
+    with session_scope() as s:
+
+        def resolve(raw):
+            return resolve_player_by_name(s, last_first_to_first_last(raw))
+
+        assert resolve("QuillonII,Zedd") == 9001
+        assert resolve("ThraskIII,Orvo") == 9002
+        assert resolve("Velderhaus,YannickKonaz") == 9003
+        assert resolve("Usmithe,Marq") is None  # "marqusmithe" fits two players: no guess
+        assert resolve("Simzor,Bennick") is None  # in the table, but never given an alias
+        stats.update_players_from_index(
+            s,
+            [
+                {
+                    "PERSON_ID": 9006,
+                    "PLAYER_FIRST_NAME": "Bennick",
+                    "PLAYER_LAST_NAME": "Simzor",
+                    "TEAM_ID": 1610612758,
+                    "POSITION": "G",
+                },
+                {
+                    "PERSON_ID": 9007,
+                    "PLAYER_FIRST_NAME": "Ajax",
+                    "PLAYER_LAST_NAME": "Dybanz",
+                    "TEAM_ID": 1610612764,
+                    "POSITION": "F",
+                },
+            ],
+            set_team=True,
+        )
+        assert resolve("Simzor,Bennick") == 9006  # the roster refresh gave him his alias
+        assert resolve("Dybanz,Ajax") == 9007  # a rookie, matchable before his first game

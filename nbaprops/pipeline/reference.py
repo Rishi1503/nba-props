@@ -5,7 +5,7 @@ from datetime import datetime
 
 from nba_api.stats.static import players as static_players
 from nba_api.stats.static import teams as static_teams
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,7 @@ from nbaprops.db.models import (
     Team,
     UnmatchedName,
 )
-from nbaprops.pipeline.names import normalize_name
+from nbaprops.pipeline.names import compact_forms, normalize_name
 
 # Spellings some books use that differ from the NBA's official team names.
 TEAM_NAME_ALIASES = {
@@ -72,18 +72,23 @@ def seed_players(session: Session) -> int:
 
 
 def ensure_player(session: Session, player_id: int, name: str) -> None:
-    """Insert a placeholder player row for ids the static list doesn't know yet (rookies)."""
+    """Insert a placeholder player row for ids the static list doesn't know yet (rookies), and
+    a name alias so the injury report can be matched to him (an existing alias, possibly a
+    namesake's, is never overwritten; a nameless row gets none)."""
+    real = (name or "").strip()
     session.execute(
         insert(Player)
         # a nameless row gets a placeholder (filled in later from box scores or the roster
         # refresh) rather than stopping a long backfill
-        .values(
-            player_id=player_id,
-            full_name=(name or "").strip() or f"Player {player_id}",
-            is_active=True,
-        )
+        .values(player_id=player_id, full_name=real or f"Player {player_id}", is_active=True)
         .on_conflict_do_nothing()
     )
+    if real:  # after the player row: the alias refers to it
+        session.execute(
+            insert(PlayerAlias)
+            .values(alias_normalized=normalize_name(real), player_id=player_id, source="roster")
+            .on_conflict_do_nothing()
+        )
 
 
 def team_id_lookup(session: Session) -> dict[str, int]:
@@ -96,9 +101,22 @@ def team_id_lookup(session: Session) -> dict[str, int]:
 
 
 def resolve_player_by_name(session: Session, name: str) -> int | None:
-    return session.scalar(
-        select(PlayerAlias.player_id).where(PlayerAlias.alias_normalized == normalize_name(name))
-    )
+    key = normalize_name(name)
+    hit = session.scalar(select(PlayerAlias.player_id).where(PlayerAlias.alias_normalized == key))
+    if hit is not None:
+        return hit
+    # Squashed spaces ("Dereck LivelyII"): accept only a single, unambiguous player.
+    for form in compact_forms(key):
+        ids = set(
+            session.scalars(
+                select(PlayerAlias.player_id).where(
+                    func.replace(PlayerAlias.alias_normalized, " ", "") == form
+                )
+            ).all()
+        )
+        if len(ids) == 1:
+            return ids.pop()
+    return None
 
 
 # --- review queue for names that matched nobody (plan, Stage 2) ---------------
