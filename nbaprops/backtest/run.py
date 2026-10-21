@@ -29,7 +29,7 @@ import pandas as pd
 
 from nbaprops.backtest import layer_b, metrics
 from nbaprops.backtest import walkforward as wf
-from nbaprops.features.build import FEATURE_COLUMNS, FEATURE_GROUPS, prev_season
+from nbaprops.features.build import FEATURE_COLUMNS, FEATURE_GROUPS, history_seasons
 from nbaprops.models import calibrate, simulate
 from nbaprops.models import minutes as mm
 from nbaprops.models import rates as rm
@@ -38,7 +38,7 @@ from nbaprops.models.project import Bundle, git_sha
 log = logging.getLogger(__name__)
 
 HOLDOUT_SEASON = "2025-26"
-FIRST_SEASON = "2021-22"  # priors warm-up only (Stage 1)
+
 REPORTS = Path("reports")
 LEDGER = REPORTS / "holdout_ledger.json"
 
@@ -98,10 +98,7 @@ def record_holdout(
 
 
 def seasons_through(season: str) -> list[str]:
-    out = [season]
-    while out[-1] > FIRST_SEASON:
-        out.append(prev_season(out[-1]))
-    return sorted(out)
+    return history_seasons(season)  # one definition, shared with the live inputs
 
 
 def load_frame(season: str, parquet: Path | None) -> pd.DataFrame:

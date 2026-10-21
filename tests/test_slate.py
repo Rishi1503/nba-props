@@ -378,3 +378,14 @@ def test_questionable_teammate_scenarios_flow_through_pricing():
     by = res.picks.set_index("player_id")
     assert CADE in by.index and by.loc[CADE, "ev_if_plays"] >= 0  # +EV either way
     assert WEMBY not in by.index and res.blocked_questionable >= 1  # only if Brown sits
+
+
+@pytest.mark.db
+def test_the_printed_board_shows_player_names(capsys):
+    from nbaprops.pricing import run as prun
+
+    seed()
+    with session_scope() as s:
+        res = slate.price_slate(s, DAY, NOW, CFG, write=False)
+    board = prun.render(res, {CADE: "Cade Cunningham"})
+    assert "Cade Cunningham" in board and f"{CADE} pts" not in board

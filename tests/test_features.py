@@ -318,3 +318,26 @@ def test_slate_ignores_injury_rows_that_didnt_match_a_player():
     slate = fb.slate_frame(inp, day, report + timedelta(minutes=30))
     assert ff.STAR not in set(slate.player_id) and 999 not in set(slate.player_id)
     assert (slate[slate.team_id == ff.A]["absent_n"] == 1).all()  # only STAR counts
+
+
+def test_live_inputs_load_the_same_history_as_training(monkeypatch):
+    """Career games and the long averages count from the first season loaded. The live path
+    loaded two seasons while training loaded everything since 2021-22, so veterans looked
+    like second-year players live and the first slate leaned under on every stat."""
+    from datetime import date
+
+    asked = []
+    monkeypatch.setattr(
+        fb, "load_inputs", lambda session, seasons=None: asked.append(sorted(seasons))
+    )
+    monkeypatch.setattr(fb, "questionable_scenarios", lambda *a, **k: (None, None, None))
+    monkeypatch.setattr(fb, "slate_frame", lambda *a, **k: None)
+    monkeypatch.setattr(fb, "training_frame", lambda *a, **k: None)
+    day, now = date(2026, 10, 21), datetime(2026, 10, 21, 16, 0, tzinfo=UTC)
+    fb.build_feature_scenarios(None, day, now, None)
+    fb.build_features(None, day, now, None)
+    fb.build_training_set(None, fb.history_seasons("2026-27"))
+    scenarios, features, training = asked
+    assert scenarios == features == fb.history_seasons("2026-27")
+    assert scenarios[0] == "2021-22" and scenarios[-1] == "2026-27"
+    assert set(training) - set(scenarios) <= {"2020-21"}  # training's extra prior season is empty

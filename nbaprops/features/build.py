@@ -1369,7 +1369,7 @@ def build_features(
 
     season = season_for_date(game_date)
     return slate_frame(
-        load_inputs(session, [prev_season(season), season]), game_date, as_of_ts, extra_players
+        load_inputs(session, history_seasons(season)), game_date, as_of_ts, extra_players
     )
 
 
@@ -1447,6 +1447,20 @@ def estimate_play_rates(
     return last.groupby("status")["played"].agg(listings="count", play_rate="mean").reset_index()
 
 
+FIRST_SEASON = "2021-22"  # the earliest season loaded (Stage 1)
+
+
+def history_seasons(season: str) -> list[str]:
+    """Every season from FIRST_SEASON through `season`. Training and live inputs must load the
+    same history: career games and the long averages count from the first season loaded, so a
+    live load of only two seasons made veterans look like second-year players (the first live
+    slate leaned under on every stat)."""
+    out = [season]
+    while out[-1] > FIRST_SEASON:
+        out.append(prev_season(out[-1]))
+    return sorted(out)
+
+
 def build_feature_scenarios(
     session, game_date: date, as_of_ts: datetime, extra_players: list[tuple[int, int]] | None = None
 ):
@@ -1454,7 +1468,7 @@ def build_feature_scenarios(
     from nbaprops.pipeline.stats import season_for_date
 
     season = season_for_date(game_date)
-    inp = load_inputs(session, [prev_season(season), season])
+    inp = load_inputs(session, history_seasons(season))  # the history training used
     return questionable_scenarios(inp, game_date, as_of_ts, extra_players)
 
 

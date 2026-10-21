@@ -9,7 +9,7 @@ a challenger: it projects in shadow and is promoted only by the champion-challen
 
 from datetime import UTC, date, datetime
 
-from nbaprops.features.build import build_training_set, prev_season
+from nbaprops.features.build import build_training_set, history_seasons
 from nbaprops.models import minutes as mm
 from nbaprops.models import rates as rm
 from nbaprops.models import simulate
@@ -21,10 +21,7 @@ FIRST_TRAIN_SEASON = "2022-23"
 
 
 def seasons_through(season: str) -> list[str]:
-    out = [season]
-    while out[-1] > "2021-22":
-        out.append(prev_season(out[-1]))
-    return sorted(out)
+    return history_seasons(season)  # the same history the live inputs load
 
 
 def retrain(session, today: date, first_train_season: str = FIRST_TRAIN_SEASON) -> str | None:
