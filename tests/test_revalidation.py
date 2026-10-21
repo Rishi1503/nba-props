@@ -305,3 +305,45 @@ def test_features_include_seeding_signals():
 
 def test_box_fixture_sanity():
     assert len(sfx.boxscore_rows()) == 18
+
+
+@pytest.mark.db
+def test_a_throttled_box_score_is_skipped_and_loaded_next_run(stats_db, monkeypatch):
+    """The stats site throttles long backfills: one game timing out must not stop the run.
+    It is skipped (left unloaded), the loader pauses and moves on, and the next run gets it."""
+    fetch = FakeFetch()
+    stats.backfill_season(fetch, "2025-26", boxscores=False)
+    sleeps = []
+    monkeypatch.setattr(stats.time, "sleep", sleeps.append)
+
+    def throttled(endpoint, key, cache=True, **params):
+        if endpoint == "boxscoretraditionalv3" and key == "0022500001":
+            raise RuntimeError("boxscoretraditionalv3 0022500001 failed after 4 tries")
+        return fetch(endpoint, key, cache=cache, **params)
+
+    stats.load_boxscores(throttled, ["0022500001", "0022500002"])
+    asked = [k for e, k in fetch.calls if e == "boxscoretraditionalv3"]
+    assert asked == ["0022500002"]  # it moved on to the next game
+    assert sleeps == [stats.COOL_DOWN_SEC]  # after letting the site cool down
+    with session_scope() as s:
+        loaded = dict(s.execute(select(Game.game_id, Game.boxscore_loaded)).all())
+    assert loaded["0022500001"] is False  # still to do
+    stats.load_boxscores(fetch, ["0022500001", "0022500002"])  # the next run
+    with session_scope() as s:
+        assert s.get(Game, "0022500001").boxscore_loaded is True
+
+
+@pytest.mark.db
+def test_the_backfill_stops_when_the_site_refuses_every_request(stats_db, monkeypatch):
+    stats.backfill_season(FakeFetch(), "2025-26", boxscores=False)
+    monkeypatch.setattr(stats.time, "sleep", lambda s: None)
+    monkeypatch.setattr(stats, "MAX_FAILURES_IN_A_ROW", 1)
+    attempts = []
+
+    def blocked(endpoint, key, cache=True, **params):
+        attempts.append(key)
+        raise RuntimeError(f"{endpoint} {key} failed after 4 tries")
+
+    with pytest.raises(stats.SiteBlocked):
+        stats.load_boxscores(blocked, ["0022500001", "0022500002"])
+    assert attempts == ["0022500001"]  # stopped instead of grinding through the rest

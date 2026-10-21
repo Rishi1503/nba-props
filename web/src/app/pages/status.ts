@@ -1,5 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Api } from '../core/api';
+import { Auth } from '../core/auth';
 import { MARKET_LABEL, money, pct } from '../core/format';
 
 /** Go-live checklist, weekly review, market switches, bankroll and settings. */
@@ -39,6 +41,7 @@ import { MARKET_LABEL, money, pct } from '../core/format';
         <p class="muted">Edit config/strategy.yaml to change these; the website shows them read-only.</p>
       </section>
     }
+    <button class="link" (click)="logout()">Log out</button>
     <section class="card small">
       <h2>Bankroll</h2>
       @for (b of bankroll(); track b.entry_date) {
@@ -51,6 +54,8 @@ import { MARKET_LABEL, money, pct } from '../core/format';
 })
 export class Status {
   private api = inject(Api);
+  private auth = inject(Auth);
+  private router = inject(Router);
   readonly keys = ['pts', 'reb', 'ast', 'fg3m', 'pra'];
   review = signal<any>(null);
   settings = signal<any>(null);
@@ -62,6 +67,11 @@ export class Status {
   reason(k: string): string { return this.control(k)?.reason ?? ''; }
 
   constructor() { this.load(); }
+
+  logout(): void {
+    this.auth.logout();
+    this.router.navigateByUrl('/login');
+  }
 
   load(): void {
     this.api.review().subscribe(r => this.review.set(r));

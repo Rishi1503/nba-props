@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from './core/auth';
 
 @Component({
@@ -10,10 +10,4 @@ import { Auth } from './core/auth';
 })
 export class App {
   protected auth = inject(Auth);
-  private router = inject(Router);
-
-  logout(): void {
-    this.auth.logout();
-    this.router.navigateByUrl('/login');
-  }
 }

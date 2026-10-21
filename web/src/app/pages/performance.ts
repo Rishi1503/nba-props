@@ -69,13 +69,16 @@ export class Performance {
   clvChart = computed<ChartConfiguration<'line'>['data']>(() => {
     const daily = this.data()?.daily ?? [];
     return { labels: daily.map((d: any) => d.game_date),
-             datasets: [{ data: daily.map((d: any) => d.clv), tension: 0.2, pointRadius: 2 }] };
+             datasets: [{ data: daily.map((d: any) => d.clv), tension: 0.2, pointRadius: 2,
+                          borderColor: '#1f6feb', backgroundColor: '#1f6feb', borderWidth: 2 }] };
   });
   calChart = computed<ChartConfiguration<'scatter'>['data']>(() => {
     const bins = this.data()?.calibration ?? [];
     return { datasets: [
-      { data: bins.map((b: any) => ({ x: b.predicted, y: b.observed })), pointRadius: 5 },
-      { data: [{ x: 0, y: 0 }, { x: 1, y: 1 }], showLine: true, pointRadius: 0, borderDash: [4, 4] },
+      { data: bins.map((b: any) => ({ x: b.predicted, y: b.observed })), pointRadius: 5,
+        backgroundColor: '#1f6feb', borderColor: '#1f6feb' },
+      { data: [{ x: 0, y: 0 }, { x: 1, y: 1 }], showLine: true, pointRadius: 0, borderDash: [4, 4],
+        borderColor: '#9aa0a6', borderWidth: 1.5 },
     ] };
   });
 

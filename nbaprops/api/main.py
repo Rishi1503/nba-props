@@ -7,7 +7,7 @@ CORS allows the origins in DASHBOARD_ORIGINS (comma-separated: the website's add
 
 import os
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -196,6 +196,32 @@ def create_app(
     def get_bets(s: DB, start: date | None = None, end: date | None = None, mode: str = "real"):
         end = end or today()
         return views.bets(s, start or views.rv.season_start(end), end, mode)
+
+    @app.get("/record", dependencies=guard)
+    def get_record(s: DB, start: date | None = None, end: date | None = None, mode: str = "paper"):
+        end = end or today()
+        return views.record(s, start or end - timedelta(days=60), end, mode)
+
+    @app.get("/success", dependencies=guard)
+    def get_success(
+        s: DB, mode: str = "paper", period: str = "week", include_tracked: bool = False
+    ):
+        if period not in ("week", "month", "year"):
+            raise HTTPException(422, "period must be week, month or year")
+        return views.success(s, mode, period, include_tracked)
+
+    @app.get("/tail", dependencies=guard)
+    def get_tail(
+        s: DB,
+        stake: float = 10.0,
+        mode: str = "paper",
+        start: date | None = None,
+        include_tracked: bool = False,
+        include_parlays: bool = True,
+    ):
+        if not 0 < stake <= 100000:
+            raise HTTPException(422, "stake must be between 0 and 100,000")
+        return views.tail(s, stake, mode, start, include_tracked, include_parlays)
 
     @app.get("/bankroll", dependencies=guard)
     def get_bankroll(s: DB):

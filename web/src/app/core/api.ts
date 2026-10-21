@@ -73,6 +73,15 @@ export class Api {
   backtests(): Observable<any[]> { return this.http.get<any[]>(this.url('/backtests')); }
   backtest(runId: string): Observable<any> { return this.http.get(this.url(`/backtests/${runId}`)); }
   bankroll(): Observable<any[]> { return this.http.get<any[]>(this.url('/bankroll')); }
+  record(f: Record<string, string | null>): Observable<any[]> {
+    return this.http.get<any[]>(this.url('/record'), { params: this.params(f) });
+  }
+  success(f: Record<string, string | null>): Observable<any[]> {
+    return this.http.get<any[]>(this.url('/success'), { params: this.params(f) });
+  }
+  tail(f: Record<string, string | null>): Observable<any> {
+    return this.http.get(this.url('/tail'), { params: this.params(f) });
+  }
   settings(): Observable<any> { return this.http.get(this.url('/settings')); }
   exportCsv(year: number, mode: string): Observable<string> {
     return this.http.get(this.url(`/export/${year}`),

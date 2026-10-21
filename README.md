@@ -321,10 +321,11 @@ A phone-first website: an Angular 21 front end (`web/`) over a FastAPI back end
 | --- | --- |
 | Board | Picks by EV: DraftKings vs fair price, stake, badges for high-confidence, model-only, injury news since the flag, and line moves. One tap marks a pick placed. Parlay panel, boost entry, manual milestone and same-game parlay prices |
 | Player | The simulated distribution with DraftKings' line marked, the last 10 games, the day's line moves |
+| Record | Every day's picks and parlays with each leg marked hit or miss; success rates by week, month and year; and "if you'd tailed every pick": a flat stake on every pick (optionally parlays and tracked flags) since day one, with the running total |
 | Bets | Placed bets with running P&L, real or paper; the yearly CSV for tax records |
 | Results | CLV by day, the calibration plot, ROI and CLV by stat and edge size, filterable |
 | Models | Two backtest reports side by side |
-| Status | Go-live checklist, weekly CLV, market switches, bankroll, strategy settings |
+| Status | Go-live checklist, weekly CLV, market switches, bankroll, strategy settings; log out |
 
 **Run it locally:**
 

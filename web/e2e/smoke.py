@@ -126,6 +126,33 @@ try:
             "player page lists recent games", page.locator("table").first.locator("tr").count() > 5
         )
         page.screenshot(path=f"{SHOTS}/2-player.png", full_page=True)
+        # Record: tail-every-pick total, success rates, day-by-day marks
+        page.locator("nav a", has_text="Record").click()
+        page.wait_for_selector("p.tail")
+        page.wait_for_timeout(500)
+        check(
+            "record page shows the tail-every-pick total",
+            page.locator("p.tail").inner_text().startswith("You'd be "),
+        )
+        check("record page draws the running total", page.locator("canvas").count() == 1)
+        check("record page lists success rates by week", page.locator("table tr").count() >= 2)
+        page.locator(".tabs button", has_text="month").click()
+        page.wait_for_timeout(400)
+        check(
+            "success rates switch to months", "Month" in page.locator("table tr").first.inner_text()
+        )
+        check(
+            "each day lists its picks with a result mark",
+            page.locator("details.day .mark").count() > 0,
+        )
+        page.locator("input[name=stake]").fill("25")
+        page.locator("button", has_text="Update").click()
+        page.wait_for_function(
+            "document.querySelector('p.small.muted') && "
+            "document.querySelector('p.small.muted').innerText.startsWith('$25.00')"
+        )
+        check("changing the stake recalculates", "$25.00 on each" in page.content())
+        page.screenshot(path=f"{SHOTS}/3a-record.png", full_page=True)
         for tab, sel, shot in (
             ("Bets", "text=Tax records", "3-bets"),
             ("Results", "canvas", "4-results"),
@@ -147,6 +174,7 @@ try:
         page.wait_for_selector("table")
         check("models page compares runs", page.locator("table tr").count() > 5)
         page.screenshot(path=f"{SHOTS}/5-models.png", full_page=True)
+        page.locator("nav a", has_text="Status").click()  # log out lives on Status
         page.locator("button", has_text="Log out").click()
         page.wait_for_url("**/login")
         check("log out returns to login", page.url.endswith("/login"))

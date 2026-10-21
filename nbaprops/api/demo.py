@@ -128,11 +128,9 @@ def seed(now: datetime | None = None) -> dict:
         poll = now - timedelta(minutes=20)
         for g, (home, away) in enumerate(TEAMS):
             gid = f"8{today:%m%d}000{g}"[:10]
-            tip = (
-                datetime.combine(today, datetime.min.time(), ET)
-                .replace(hour=19 + g)
-                .astimezone(UTC)
-            )
+            # Tip-offs 2, 3 and 4 hours from now (kept on today's slate), so the demo board
+            # has games to price whatever time of day it runs.
+            tip = now + timedelta(hours=2 + g)
             s.add(
                 Game(
                     game_id=gid,

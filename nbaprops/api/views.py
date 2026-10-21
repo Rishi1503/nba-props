@@ -3,7 +3,7 @@ is tested directly. All values are JSON-ready (floats, ints, ISO strings)."""
 
 import csv
 import io
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -489,4 +489,212 @@ def bets(session, start: date, end: date, mode: str = "real") -> dict:
                 k: int((rows["result"] == k).sum()) for k in ("win", "loss", "push", "void")
             },
         },
+    }
+
+
+# --- Record: daily results, success rates, and the tail-every-pick calculator ----------------
+
+RESULT_ORDER = ("win", "loss", "push", "void")
+ALL_TIME_END = date(2100, 1, 1)  # "all time": no cut-off at today's date
+
+
+def _picks_between(
+    session, start: date, end: date, mode: str, include_tracked: bool, settled_only: bool = False
+) -> pd.DataFrame:
+    """The app's picks on games from `start` to `end`. Without `include_tracked`, only the
+    picks it said to bet (stake > 0); boost-only legs never count as picks."""
+    df = _q(
+        session,
+        f"""
+        SELECT p.pick_id, g.game_date, pl.full_name AS player, p.player_id, p.market, p.side,
+               p.line, p.dk_price, p.stake, p.tier, p.result, p.pnl
+        FROM picks p JOIN games g USING (game_id) LEFT JOIN players pl USING (player_id)
+        WHERE p.mode = :m AND p.tier <> 'boost_leg' AND g.game_date BETWEEN :a AND :b
+          {"" if include_tracked else "AND p.stake > 0"}
+          {"AND p.result IS NOT NULL" if settled_only else ""}
+        ORDER BY g.game_date, p.pick_id""",
+        m=mode,
+        a=start,
+        b=end,
+    )
+    df["line"] = df["line"].astype(float)
+    return df
+
+
+def _parlays_between(
+    session, start: date, end: date, mode: str
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    par = _q(
+        session,
+        """SELECT parlay_id, slate_date, tier, same_game, dk_price, boost_pct,
+                                stake, result, pnl
+                         FROM parlays WHERE mode = :m AND slate_date BETWEEN :a AND :b
+                         ORDER BY slate_date, parlay_id""",
+        m=mode,
+        a=start,
+        b=end,
+    )
+    legs = _q(
+        session,
+        """
+        SELECT l.parlay_id, p.pick_id, pl.full_name AS player, p.market, p.side, p.line,
+               p.dk_price, p.result
+        FROM parlay_legs l JOIN picks p USING (pick_id) LEFT JOIN players pl USING (player_id)
+        WHERE l.parlay_id = ANY(:ids) ORDER BY l.parlay_id, p.pick_id""",
+        ids=par["parlay_id"].tolist(),
+    )
+    return par, legs
+
+
+def record(session, start: date, end: date, mode: str = "paper") -> list[dict]:
+    """Day by day, newest first: every pick (bet or tracked) with its result, and every parlay
+    with each leg's result."""
+    picks = _picks_between(session, start, end, mode, include_tracked=True)
+    par, legs = _parlays_between(session, start, end, mode)
+    days = sorted(set(picks["game_date"]) | set(par["slate_date"]), reverse=True)
+    out = []
+    for day in days:
+        dp = picks[picks["game_date"] == day]
+        dpar = par[par["slate_date"] == day]
+        bet = dp[dp["stake"].astype(float) > 0]
+        parlays = []
+        for p in _records(dpar):
+            p["legs"] = _records(
+                legs[legs["parlay_id"] == p["parlay_id"]].drop(columns="parlay_id")
+            )
+            p["legs_hit"] = sum(1 for leg in p["legs"] if leg["result"] == "win")
+            parlays.append(p)
+        out.append(
+            {
+                "date": str(day),
+                "record": {k: int((bet["result"] == k).sum()) for k in RESULT_ORDER},
+                "pending": int(bet["result"].isna().sum()),
+                "picks": _records(dp.drop(columns=["game_date"])),
+                "parlays": parlays,
+            }
+        )
+    return out
+
+
+def _period_key(d: date, period: str) -> str:
+    if period == "week":  # Monday-to-Sunday weeks, labeled by their Monday
+        return str(d - timedelta(days=d.weekday()))
+    if period == "month":
+        return f"{d:%Y-%m}"
+    return f"{d:%Y}"
+
+
+def _rate(won: int, lost: int) -> float | None:
+    return round(won / (won + lost), 4) if won + lost else None
+
+
+def success(
+    session, mode: str = "paper", period: str = "week", include_tracked: bool = False
+) -> list[dict]:
+    """Hit rates per week, month or year: picks, parlays cashed, and parlay legs. Pushes and
+    voids are refunded, so they count in neither column."""
+    end = ALL_TIME_END
+    start = date(2000, 1, 1)
+    picks = _picks_between(session, start, end, mode, include_tracked, settled_only=True)
+    par, legs = _parlays_between(session, start, end, mode)
+    par = par[par["result"].notna()]
+    legs = legs[legs["parlay_id"].isin(par["parlay_id"])]
+    picks = picks.assign(key=[_period_key(d, period) for d in picks["game_date"]])
+    par = par.assign(key=[_period_key(d, period) for d in par["slate_date"]])
+    legs = legs.merge(par[["parlay_id", "key"]], on="parlay_id")
+    out = []
+    for key in sorted(set(picks["key"]) | set(par["key"]), reverse=True):
+        pk, pr, lg = picks[picks["key"] == key], par[par["key"] == key], legs[legs["key"] == key]
+        w, lo = int((pk["result"] == "win").sum()), int((pk["result"] == "loss").sum())
+        pw, pl_ = int((pr["result"] == "win").sum()), int((pr["result"] == "loss").sum())
+        lw, ll = int((lg["result"] == "win").sum()), int((lg["result"] == "loss").sum())
+        out.append(
+            {
+                "period": key,
+                "picks": {
+                    "won": w,
+                    "lost": lo,
+                    "pushed": int(pk["result"].isin(["push", "void"]).sum()),
+                    "hit_rate": _rate(w, lo),
+                },
+                "parlays": {"won": pw, "lost": pl_, "hit_rate": _rate(pw, pl_)},
+                "legs": {"won": lw, "lost": ll, "hit_rate": _rate(lw, ll)},
+            }
+        )
+    return out
+
+
+def tail(
+    session,
+    stake: float,
+    mode: str = "paper",
+    start: date | None = None,
+    include_tracked: bool = False,
+    include_parlays: bool = True,
+) -> dict:
+    """What a flat `stake` on every pick (and parlay) since `start` would have made, at the
+    price when each pick was flagged. Parlays use their own settled return per dollar, so
+    pushes, voids and boosts follow the same rules as settlement."""
+    start = start or date(2000, 1, 1)
+    end = ALL_TIME_END
+    picks = _picks_between(session, start, end, mode, include_tracked)
+    pending = int(picks["result"].isna().sum())
+    s = picks[picks["result"].notna()]
+    dec = np.array([to_decimal(int(p)) for p in s["dk_price"]], dtype=float)
+    per_dollar = np.select([s["result"] == "win", s["result"] == "loss"], [dec - 1, -1.0], 0.0)
+    rows = pd.DataFrame(
+        {
+            "date": s["game_date"],
+            "kind": "pick",
+            "result": s["result"],
+            "profit": per_dollar * stake,
+        }
+    )
+    if include_parlays:
+        par, _ = _parlays_between(session, start, end, mode)
+        pending += int(par["result"].isna().sum())
+        par = par[par["result"].notna() & (par["stake"].astype(float) > 0)]
+        ret = par["pnl"].astype(float) / par["stake"].astype(float)
+        rows = pd.concat(
+            [
+                rows,
+                pd.DataFrame(
+                    {
+                        "date": par["slate_date"],
+                        "kind": "parlay",
+                        "result": par["result"],
+                        "profit": ret * stake,
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+    if rows.empty:
+        return {
+            "stake": stake,
+            "bets": 0,
+            "pending": pending,
+            "wagered": 0.0,
+            "profit": 0.0,
+            "roi": None,
+            "record": {k: 0 for k in RESULT_ORDER},
+            "daily": [],
+        }
+    counted = rows[~rows["result"].isin(["push", "void"])]
+    wagered = stake * len(counted)
+    daily = rows.groupby("date")["profit"].sum().sort_index()
+    return {
+        "stake": stake,
+        "bets": int(len(rows)),
+        "pending": pending,
+        "wagered": round(wagered, 2),
+        "profit": round(float(rows["profit"].sum()), 2),
+        "roi": round(float(rows["profit"].sum()) / wagered, 4) if wagered else None,
+        "record": {k: int((rows["result"] == k).sum()) for k in RESULT_ORDER},
+        "parlays": int((rows["kind"] == "parlay").sum()),
+        "first_date": str(min(rows["date"])),
+        "daily": [
+            {"date": str(d), "profit": round(float(p), 2), "cumulative": round(float(c), 2)}
+            for d, p, c in zip(daily.index, daily.values, daily.cumsum().values, strict=True)
+        ],
     }
