@@ -288,3 +288,33 @@ def test_feature_frame_is_numeric_and_complete(train):
         [not np.issubdtype(dt, np.number) for dt in x.dtypes]
     ]
     assert len(train) == len(train.drop_duplicates(["game_id", "player_id"]))
+
+
+def test_slate_ignores_injury_rows_that_didnt_match_a_player():
+    """Opening week: the injury report lists names the pipeline couldn't match yet (empty
+    player or team id). They're ignored with a warning instead of breaking the slate."""
+    day = ff.future_date()
+    report = datetime(day.year, day.month, day.day, 17, 0, tzinfo=UTC)
+    inp = ff.build()
+    unmatched = [
+        {
+            "report_ts": report,
+            "game_id": ff.FUTURE_GAME,
+            "team_id": ff.A,
+            "player_id": None,
+            "status": "Available",
+        },
+        {
+            "report_ts": report,
+            "game_id": ff.FUTURE_GAME,
+            # a matched player whose team didn't match, listed as able to play: the row
+            # that reached the candidate list and broke it
+            "team_id": None,
+            "player_id": 999,
+            "status": "Probable",
+        },
+    ]
+    inp.injuries = pd.concat([_injuries("Out", report), pd.DataFrame(unmatched)], ignore_index=True)
+    slate = fb.slate_frame(inp, day, report + timedelta(minutes=30))
+    assert ff.STAR not in set(slate.player_id) and 999 not in set(slate.player_id)
+    assert (slate[slate.team_id == ff.A]["absent_n"] == 1).all()  # only STAR counts

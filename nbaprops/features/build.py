@@ -14,6 +14,7 @@ they are model features. `market_*` columns come from logged odds and exist only
 2026-27 season on; they center the Stage 5 simulation and are not v1 training features.
 """
 
+import logging
 from bisect import bisect_left
 from collections import defaultdict
 from dataclasses import dataclass, replace
@@ -26,6 +27,8 @@ from sqlalchemy import text
 
 from nbaprops.config import load_strategy
 from nbaprops.settings import get_settings
+
+log = logging.getLogger(__name__)
 
 STATS = ["pts", "reb", "ast", "fg3m", "fg3a", "fga", "fta", "tov"]
 WINDOWS = (5, 10, 20)
@@ -854,6 +857,18 @@ def market_lines(game_lines: pd.DataFrame | None, as_of: datetime | None) -> pd.
 def _prepare(inp: FeatureInputs) -> FeatureInputs:
     for df in (inp.logs, inp.team_logs, inp.games):
         df["game_date"] = _dt(df["game_date"])
+    inj = inp.injuries
+    if inj is not None and len(inj):
+        # Report rows whose name or team didn't match (they're listed by `pipeline.run aliases`)
+        # can't be placed on a roster: drop them here so no step meets an empty id.
+        unmatched = inj["player_id"].isna() | inj["team_id"].isna()
+        if unmatched.any():
+            log.warning(
+                "injury report: ignoring %d rows whose player or team didn't match "
+                "(match them with `pipeline.run aliases` / `alias-add`)",
+                int(unmatched.sum()),
+            )
+            inp.injuries = inj[~unmatched].copy()
     players = inp.players.copy()
     players["pos"] = players["position"].map(primary_position)
     inp.players = players
