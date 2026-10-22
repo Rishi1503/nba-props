@@ -172,6 +172,14 @@ def holdout_verdict(
     return {m: bool(v["passes"]) for m, v in markets.items()}, report
 
 
+def model_inputs(without: str | None) -> list[str] | None:
+    """Every input, or every input except one group (`--without roster`)."""
+    if not without:
+        return None
+    drop = set(FEATURE_GROUPS[without])
+    return [c for c in FEATURE_COLUMNS if c not in drop]
+
+
 def save_production(
     df,
     oos,
@@ -180,6 +188,7 @@ def save_production(
     holdout_run: str,
     models_dir: Path = Path("artifacts/models"),
     accepted_rerun: str | None = None,
+    features: list[str] | None = None,
 ) -> Path:
     """The production bundle, recording which markets passed the holdout. Markets that failed
     are switched off when it is imported as champion; none passing means no bundle."""
@@ -187,7 +196,9 @@ def save_production(
     failed = sorted(m for m, ok in verdict.items() if not ok)
     if not passed:
         raise SystemExit("No market passed the holdout: no production model.")
-    bundle = production_bundle(df, oos, f"prod-{datetime.now(UTC):%Y%m%d%H%M}", first_train_season)
+    bundle = production_bundle(
+        df, oos, f"prod-{datetime.now(UTC):%Y%m%d%H%M}", first_train_season, features=features
+    )
     bundle.meta["holdout"] = {
         "run_id": holdout_run,
         "passed": passed,
@@ -214,6 +225,7 @@ def production_from_holdout(args) -> dict:
         first_train_season=s["first_train_season"],
         cache_dir=args.cache,
         label=f"{args.from_holdout}-production",
+        features=model_inputs(s.get("without")),  # the inputs that run evaluated
     )
     target, warm = wf.run(df, HOLDOUT_SEASON, settings)
     oos = pd.concat([x.lines for x in (warm, target) if x is not None], ignore_index=True)
@@ -224,6 +236,7 @@ def production_from_holdout(args) -> dict:
         verdict,
         args.from_holdout,
         accepted_rerun=args.accept_rerun,
+        features=model_inputs(s.get("without")),
     )
     return {"bundle": str(folder), "verdict": verdict}
 
@@ -391,6 +404,11 @@ def main(argv: list[str] | None = None) -> dict:
     ap.add_argument("--rerun-holdout", metavar="REASON")
     ap.add_argument("--from-holdout", metavar="RUN_ID")
     ap.add_argument(
+        "--without",
+        choices=sorted(FEATURE_GROUPS),
+        help="evaluate (and build production) without one group of inputs",
+    )
+    ap.add_argument(
         "--accept-rerun",
         metavar="REASON",
         help="build production from a not-clean holdout rerun (recorded)",
@@ -412,6 +430,7 @@ def main(argv: list[str] | None = None) -> dict:
         first_train_season=args.first_train_season,
         cache_dir=args.cache,
         label=run_id,
+        features=model_inputs(args.without),
     )
     market = None
     if args.layer_b:
@@ -439,6 +458,7 @@ def main(argv: list[str] | None = None) -> dict:
             "retrain_days": args.retrain_days,
             "n_sims": args.n_sims,
             "first_train_season": args.first_train_season,
+            "without": args.without,
         },
         "holdout": ("clean" if clean else f"NOT CLEAN (rerun: {args.rerun_holdout})")
         if args.season == HOLDOUT_SEASON
@@ -491,6 +511,7 @@ def main(argv: list[str] | None = None) -> dict:
             verdict,
             run_id,
             accepted_rerun=None if clean else args.accept_rerun,
+            features=model_inputs(args.without),
         )
     return report
 

@@ -74,7 +74,12 @@ def fake_training(monkeypatch, seen):
         return SimpleNamespace(lines=lines), SimpleNamespace(lines=lines)
 
     monkeypatch.setattr(run.wf, "run", walk)
-    monkeypatch.setattr(run, "production_bundle", lambda df, oos, run_id, first: FakeBundle(run_id))
+
+    def build(df, oos, run_id, first, features=None):
+        seen["production_features"] = features
+        return FakeBundle(run_id)
+
+    monkeypatch.setattr(run, "production_bundle", build)
 
 
 def test_production_from_the_holdout_never_evaluates_it_again(tmp_path, monkeypatch):
@@ -183,3 +188,42 @@ def test_a_rerun_needs_an_explicit_recorded_acceptance(tmp_path, monkeypatch):
     meta = json.loads((tmp_path / out["bundle"] / "meta.json").read_text())
     assert meta["holdout"]["clean"] is False and meta["holdout"]["accepted_rerun"] == why
     assert meta["holdout"]["passed"] == ["pts", "reb"]
+
+
+def test_model_inputs_without_a_group():
+    from nbaprops.features.build import FEATURE_COLUMNS, FEATURE_GROUPS
+
+    assert run.model_inputs(None) is None
+    kept = run.model_inputs("roster")
+    assert not set(FEATURE_GROUPS["roster"]) & set(kept)
+    assert len(kept) == len(FEATURE_COLUMNS) - len(FEATURE_GROUPS["roster"])
+
+
+def test_production_uses_the_inputs_the_rerun_evaluated(tmp_path, monkeypatch):
+    """The 2025-26 rerun is evaluated without the roster inputs (no help once the leakage was
+    gone): the walk-forward and the production model must both leave them out."""
+    reports = recorded(tmp_path, {"pts": True})
+    report = {
+        "run_id": "bt-rerun",
+        "settings": {**SETTINGS, "without": "roster"},
+        "layer_a": {"targets": {"passes": True, "markets": {"pts": {"passes": True}}}},
+    }
+    (reports / "backtest" / "bt-rerun.json").write_text(json.dumps(report))
+    monkeypatch.chdir(tmp_path)
+    seen = {}
+    fake_training(monkeypatch, seen)
+    run.main(
+        [
+            "--season",
+            "2025-26",
+            "--from-holdout",
+            "bt-rerun",
+            "--accept-rerun",
+            "fix",
+            "--reports",
+            str(reports),
+        ]
+    )
+    expected = run.model_inputs("roster")
+    assert seen["settings"].features == expected
+    assert seen["production_features"] == expected

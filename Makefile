@@ -103,10 +103,10 @@ import-champion:
 	uv run python -m nbaprops.ops.run import-bundle $(BUNDLE) --champion
 
 # Re-evaluate the holdout after a model fix (recorded as NOT clean) and build production
-# from it: make holdout-rerun REASON="what changed"
+# from it: make holdout-rerun REASON="what changed" [WITHOUT=roster]
 holdout-rerun:
 	uv run python -m nbaprops.backtest.run --season 2025-26 --production \
-		--rerun-holdout "$(REASON)" --accept-rerun "$(REASON)"
+		--rerun-holdout "$(REASON)" --accept-rerun "$(REASON)" $(if $(WITHOUT),--without $(WITHOUT),)
 
 # Build the production bundle from the recorded holdout run, without re-evaluating it:
 # make production-from-holdout RUN=bt-2025-26-...
