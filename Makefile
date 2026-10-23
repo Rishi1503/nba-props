@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout holdout-rerun bankroll review golive tune recalibrate api web demo e2e
+.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-tails backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout holdout-rerun bankroll review golive tune recalibrate api web demo e2e
 
 setup:
 	uv sync --all-extras --locked
@@ -70,6 +70,11 @@ backtest-tune:
 # The 2025-26 holdout: ONCE, after tuning is finished; a second run is refused (README).
 # If it passes, the same run retrains on every season and saves the production bundle, so
 # the holdout is looked at exactly once.
+# Calibration where staked picks and alt-line rungs live (55-95%), on the practice season,
+# for the production configuration (no roster inputs)
+backtest-tails:
+	uv run python -m nbaprops.backtest.run --season 2024-25 --without roster --tails
+
 backtest-holdout:
 	uv run python -m nbaprops.backtest.run --season 2025-26 --production
 

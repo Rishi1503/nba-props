@@ -527,3 +527,38 @@ def test_layer_b_prices_milestones_and_reports_parlays_and_growth(frame):
     assert priced_ms["has_consensus"].all()  # anchored on the consensus main line
     assert set(out) >= {"bets", "blend", "satellites", "growth", "by_line_type"}
     assert out["growth"]["singles_only"]["days"] > 0
+
+
+def test_command_line_tail_calibration(frame, tmp_path):
+    """--tails grids every player-game of the season and scores the 55-95% bands, on the
+    production configuration (--without roster)."""
+    parquet = tmp_path / "train.parquet"
+    frame.to_parquet(parquet)
+    rep = bt.main(
+        [
+            "--season",
+            bt.HOLDOUT_SEASON,
+            "--features",
+            str(parquet),
+            "--retrain-days",
+            "14",
+            "--n-sims",
+            "300",
+            "--first-train-season",
+            "2024-25",
+            "--cache",
+            str(tmp_path / "cache"),
+            "--reports",
+            str(tmp_path / "reports"),
+            "--tails",
+            "--without",
+            "roster",
+        ]
+    )
+    t = rep["tails"]
+    scored = [b for bands in t["bands"].values() for b in bands]
+    assert scored and all(b["n"] >= 200 for b in scored)
+    assert {g.split()[1] for g in t["bands"]} <= {"over", "under"}
+    assert rep["settings"]["without"] == "roster"
+    md = (tmp_path / "reports" / "backtest" / f"{rep['run_id']}.md").read_text()
+    assert "Tail calibration" in md

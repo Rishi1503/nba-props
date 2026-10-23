@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from nbaprops.backtest import layer_b, metrics
+from nbaprops.backtest import layer_b, metrics, tails
 from nbaprops.backtest import walkforward as wf
 from nbaprops.features.build import FEATURE_COLUMNS, FEATURE_GROUPS, history_seasons
 from nbaprops.models import calibrate, simulate
@@ -343,6 +343,8 @@ def render_markdown(report: dict) -> str:
         "Small samples: per-slice numbers in the JSON report are descriptive, not "
         "evidence. Bet thresholds are tuned on paper-trading data, never on this report.",
     ]
+    if "tails" in report:
+        lines += tails.render(report["tails"])
     return "\n".join(lines) + "\n"
 
 
@@ -404,6 +406,11 @@ def main(argv: list[str] | None = None) -> dict:
     ap.add_argument("--rerun-holdout", metavar="REASON")
     ap.add_argument("--from-holdout", metavar="RUN_ID")
     ap.add_argument(
+        "--tails",
+        action="store_true",
+        help="also check calibration from 55% to 95% on every grid line",
+    )
+    ap.add_argument(
         "--without",
         choices=sorted(FEATURE_GROUPS),
         help="evaluate (and build production) without one group of inputs",
@@ -449,6 +456,14 @@ def main(argv: list[str] | None = None) -> dict:
                 .drop_duplicates()
                 .reset_index(drop=True)
             )
+    if args.tails:  # a calibrated grid for every player-game of the season
+        season_rows = df.loc[df["season"] == args.season, ["game_id", "player_id"]]
+        keys = season_rows.merge(pd.DataFrame({"market": simulate.MARKETS}), how="cross")
+        settings.grid_keys = (
+            keys
+            if settings.grid_keys is None
+            else pd.concat([settings.grid_keys, keys]).drop_duplicates().reset_index(drop=True)
+        )
     target, warm = wf.run(df, args.season, settings)
     report = {
         "run_id": run_id,
@@ -476,6 +491,8 @@ def main(argv: list[str] | None = None) -> dict:
         report["layer_b"] = layer_b.section(
             target.priced, *market, rules, args.flag_at, target.grids
         )
+    if args.tails:
+        report["tails"] = tails.tail_report(tails.favored_points(target.grids, target.rows))
     if args.ablate:
         drop = set(FEATURE_GROUPS[args.ablate])
         without = wf.Settings(
