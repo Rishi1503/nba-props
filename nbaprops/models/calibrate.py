@@ -48,7 +48,7 @@ class Calibrator:
         if market not in self.curves:
             return np.clip(p, P_MIN, P_MAX)
         x, y = self.curves[market]
-        return np.interp(p, x, y)
+        return np.clip(extend(p, np.asarray(x, float), np.asarray(y, float)), P_MIN, P_MAX)
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -58,6 +58,23 @@ class Calibrator:
     def load(cls, path: Path) -> "Calibrator":
         d = json.loads(path.read_text())
         return cls({k: (v[0], v[1]) for k, v in d["curves"].items()})
+
+
+def extend(p: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """The fitted curve inside [x[0], x[-1]]; outside it, the correction at the edge fades
+    linearly to none at 0 and at 1. The curve is fit on test lines near each player's typical
+    output (raw probabilities of roughly 0.35-0.65 for points), so plain interpolation pinned
+    every line beyond that range at the edge value: "over 10.5 points" for a 25-point scorer,
+    truly ~97%, came out 62%, and long-shot alt-line rungs looked like huge edges. Continuous
+    at the edges and never reorders probabilities (the slopes stay positive)."""
+    out = np.interp(p, x, y)
+    lo, hi = float(x[0]), float(x[-1])
+    above, below = p > hi, p < lo
+    if hi < 1:
+        out[above] = p[above] + (y[-1] - hi) * (1 - p[above]) / (1 - hi)
+    if lo > 0:
+        out[below] = p[below] + (y[0] - lo) * p[below] / lo
+    return out
 
 
 def _isotonic(p: np.ndarray, y: np.ndarray) -> tuple[list[float], list[float]]:

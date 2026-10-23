@@ -52,3 +52,36 @@ def test_the_favored_side_is_scored():
     assert list(pts["side"]) == ["over", "under"]  # 4.5: over at 80%; 10.5: under at 80%
     assert list(pts["q"]) == [0.8, 0.8] and list(pts["hit"]) == [1.0, 1.0]
     assert "Tail calibration" in "\n".join(tails.render(tails.tail_report(pts)))
+
+
+def test_the_calibrator_no_longer_pins_lines_beyond_its_fitted_range():
+    """2024-25 tail check: 200,000+ points lines piled up at P = 0.62 (truly ~0.84) because
+    interpolation went flat beyond the fitted range. Inside the range nothing changes."""
+    from nbaprops.models.calibrate import Calibrator
+
+    x, y = [0.35, 0.5, 0.65], [0.33, 0.5, 0.62]
+    cal = Calibrator({"pts": (x, y)})
+    inside = np.linspace(0.35, 0.65, 31)
+    assert np.allclose(cal.apply("pts", inside), np.interp(inside, x, y))
+    far = cal.apply("pts", np.array([0.80, 0.90, 0.97, 0.20, 0.05]))
+    assert len(set(np.round(far, 4))) == 5  # no pile-up at one value
+    assert far[2] > 0.95 and far[4] < 0.06  # a raw 97% stays ~97%, a raw 5% ~5%
+    edges = cal.apply("pts", np.array([0.65 - 1e-9, 0.65 + 1e-9, 0.35 - 1e-9, 0.35 + 1e-9]))
+    assert abs(edges[0] - edges[1]) < 1e-6 and abs(edges[2] - edges[3]) < 1e-6  # continuous
+    out = cal.apply("pts", np.linspace(0, 1, 2001))
+    assert np.all(np.diff(out) >= -1e-12)  # never reorders probabilities
+
+
+def test_a_narrow_calibrator_no_longer_creates_a_tail_pile_up():
+    """The same league, with probabilities passed through a calibrator fit only on 0.35-0.65
+    (as the backtest's near-median test lines are): the tails stay calibrated."""
+    from nbaprops.models.calibrate import Calibrator
+
+    grids, rows = league()
+    cal = Calibrator({"reb": ([0.35, 0.65], [0.35, 0.65])})
+    grids["p_over"] = [
+        {k: float(cal.apply("reb", np.array([v]))[0]) for k, v in g.items()}
+        for g in grids["p_over"]
+    ]
+    out = tails.tail_report(tails.favored_points(grids, rows))
+    assert out["passes"], out["failures"]
