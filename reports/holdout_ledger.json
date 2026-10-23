@@ -7,5 +7,14 @@
     "clean": true,
     "reason": null,
     "passes": false
+  },
+  {
+    "season": "2025-26",
+    "run_id": "bt-2025-26-202610220059",
+    "date": "2026-10-22T01:30:32.334751+00:00",
+    "git_sha": "46380a62e456f37168715f69c8d1d16afdf28868",
+    "clean": false,
+    "reason": "rerun after removing pre-game leakage; roster inputs dropped (no help without leakage)",
+    "passes": true
   }
 ]

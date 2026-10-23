@@ -274,3 +274,49 @@ def test_the_2026_report_format_with_squashed_team_names():
         ("Los Angeles Clippers", "Harden,James", "Probable"),
         ("Los Angeles Clippers", "Leonard,Kawhi", "Out"),
     ]
+
+
+def test_draftkings_milestones_with_the_threshold_in_the_name():
+    """The real feed (Oct 2026): DraftKings' alt ladders are milestones with an empty point
+    and the threshold in the name. They were all dropped; now "N+" is over N - 0.5."""
+
+    def rung(name, price):
+        return {
+            "name": name,
+            "description": "Jaylen Brown",
+            "price": price,
+            "point": None,
+            "player_id": "nba:1627759",
+            "side": None,
+        }
+
+    payload = {
+        "bookmakers": [
+            {
+                "key": "draftkings",
+                "markets": [
+                    {
+                        "key": "player_assists",
+                        "line_type": "milestone",
+                        "period": None,
+                        "team": None,
+                        "suspended_at": None,
+                        "outcomes": [rung("3+ Assists", -336), rung("10+ Assists", 2700)],
+                    },
+                    {
+                        "key": "player_points",
+                        "line_type": "milestone",
+                        "period": None,
+                        "team": None,
+                        "suspended_at": None,
+                        "outcomes": [rung("Double Double", 400)],
+                    },  # no threshold: skip
+                ],
+            }
+        ]
+    }
+    got = sorted(
+        (q.market, q.line, q.over_price, q.under_price, q.nba_player_id)
+        for q in parse_props(payload)
+    )
+    assert got == [("ast", 2.5, -336, None, 1627759), ("ast", 9.5, 2700, None, 1627759)]

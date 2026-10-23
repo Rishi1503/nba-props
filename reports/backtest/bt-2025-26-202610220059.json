@@ -1,0 +1,2771 @@
+{
+  "run_id": "bt-2025-26-202610220059",
+  "git_sha": "46380a62e456f37168715f69c8d1d16afdf28868",
+  "created": "2026-10-22T01:30:25.324632+00:00",
+  "settings": {
+    "retrain_days": 7,
+    "n_sims": 2000,
+    "first_train_season": "2022-23",
+    "without": "roster"
+  },
+  "holdout": "NOT CLEAN (rerun: rerun after removing pre-game leakage; roster inputs dropped (no help without leakage))",
+  "layer_a": {
+    "season": "2025-26",
+    "markets": {
+      "pts": {
+        "accuracy": {
+          "n": 28489,
+          "mae_model": 4.3869,
+          "mae_baseline": 4.6964,
+          "mae_improvement": 0.0659,
+          "rmse_model": 5.8016,
+          "rmse_baseline": 6.1848
+        },
+        "probabilities": {
+          "n_lines": 142965,
+          "n_player_games": 28593,
+          "brier_raw": 0.23795,
+          "log_loss_raw": 0.66871,
+          "ece_raw": 0.014,
+          "brier_calibrated": 0.23725,
+          "log_loss_calibrated": 0.66696,
+          "ece_calibrated": 0.0054,
+          "log_loss_baseline": 0.72164,
+          "log_loss_model_same_rows": 0.667,
+          "brier_baseline": 0.25525,
+          "reliability": [
+            {
+              "bin": "0.1-0.2",
+              "n": 1227,
+              "predicted": 0.1918,
+              "observed": 0.1744
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 7808,
+              "predicted": 0.2594,
+              "observed": 0.2531
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 33392,
+              "predicted": 0.3595,
+              "observed": 0.3546
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 38170,
+              "predicted": 0.4493,
+              "observed": 0.4435
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 40756,
+              "predicted": 0.5453,
+              "observed": 0.5385
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 21612,
+              "predicted": 0.6103,
+              "observed": 0.6083
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28593,
+          "share": [
+            0.1493,
+            0.0934,
+            0.0856,
+            0.0882,
+            0.0861,
+            0.0893,
+            0.0997,
+            0.0995,
+            0.1029,
+            0.1059
+          ],
+          "outer_share": 0.2553,
+          "mean": 0.4879,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2025-10": {
+              "rows": 1791,
+              "mae_improvement": 0.1026,
+              "log_loss": 0.66674
+            },
+            "2025-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0421,
+              "log_loss": 0.66546
+            },
+            "2025-12": {
+              "rows": 4226,
+              "mae_improvement": 0.032,
+              "log_loss": 0.66925
+            },
+            "2026-01": {
+              "rows": 4944,
+              "mae_improvement": 0.0358,
+              "log_loss": 0.66574
+            },
+            "2026-02": {
+              "rows": 3590,
+              "mae_improvement": 0.0554,
+              "log_loss": 0.6705
+            },
+            "2026-03": {
+              "rows": 5170,
+              "mae_improvement": 0.0684,
+              "log_loss": 0.66786
+            },
+            "2026-04": {
+              "rows": 3130,
+              "mae_improvement": 0.1358,
+              "log_loss": 0.66583
+            },
+            "2026-05": {
+              "rows": 877,
+              "mae_improvement": 0.1696,
+              "log_loss": 0.6569
+            },
+            "2026-06": {
+              "rows": 101,
+              "mae_improvement": 0.1895,
+              "log_loss": 0.65655
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24836,
+              "mae_improvement": 0.0635,
+              "log_loss": 0.66785
+            },
+            "True": {
+              "rows": 3757,
+              "mae_improvement": 0.0846,
+              "log_loss": 0.66107
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1466,
+              "mae_improvement": 0.0879,
+              "log_loss": 0.66245
+            },
+            "True": {
+              "rows": 27127,
+              "mae_improvement": 0.0648,
+              "log_loss": 0.66721
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26546,
+              "mae_improvement": 0.0582,
+              "log_loss": 0.66777
+            },
+            "True": {
+              "rows": 2047,
+              "mae_improvement": 0.1627,
+              "log_loss": 0.65649
+            }
+          }
+        }
+      },
+      "reb": {
+        "accuracy": {
+          "n": 28489,
+          "mae_model": 1.8023,
+          "mae_baseline": 1.9244,
+          "mae_improvement": 0.0634,
+          "rmse_model": 2.4211,
+          "rmse_baseline": 2.5534
+        },
+        "probabilities": {
+          "n_lines": 142965,
+          "n_player_games": 28593,
+          "brier_raw": 0.19573,
+          "log_loss_raw": 0.57489,
+          "ece_raw": 0.0102,
+          "brier_calibrated": 0.1957,
+          "log_loss_calibrated": 0.57481,
+          "ece_calibrated": 0.0057,
+          "log_loss_baseline": 0.61939,
+          "log_loss_model_same_rows": 0.57469,
+          "brier_baseline": 0.20928,
+          "reliability": [
+            {
+              "bin": "0.0-0.1",
+              "n": 5070,
+              "predicted": 0.0749,
+              "observed": 0.071
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 21903,
+              "predicted": 0.1555,
+              "observed": 0.1485
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 22416,
+              "predicted": 0.248,
+              "observed": 0.2412
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 19805,
+              "predicted": 0.3428,
+              "observed": 0.3361
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 19939,
+              "predicted": 0.4478,
+              "observed": 0.4477
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 16096,
+              "predicted": 0.5522,
+              "observed": 0.5442
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 17429,
+              "predicted": 0.6489,
+              "observed": 0.6385
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 13929,
+              "predicted": 0.7427,
+              "observed": 0.74
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 6157,
+              "predicted": 0.8421,
+              "observed": 0.8418
+            },
+            {
+              "bin": "0.9-1.0",
+              "n": 221,
+              "predicted": 0.9088,
+              "observed": 0.9231
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28593,
+          "share": [
+            0.1014,
+            0.1075,
+            0.1026,
+            0.1008,
+            0.0995,
+            0.1001,
+            0.1022,
+            0.0948,
+            0.097,
+            0.0941
+          ],
+          "outer_share": 0.1954,
+          "mean": 0.4916,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2025-10": {
+              "rows": 1791,
+              "mae_improvement": 0.1222,
+              "log_loss": 0.57683
+            },
+            "2025-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0573,
+              "log_loss": 0.57529
+            },
+            "2025-12": {
+              "rows": 4226,
+              "mae_improvement": 0.0407,
+              "log_loss": 0.57694
+            },
+            "2026-01": {
+              "rows": 4944,
+              "mae_improvement": 0.036,
+              "log_loss": 0.57539
+            },
+            "2026-02": {
+              "rows": 3590,
+              "mae_improvement": 0.0451,
+              "log_loss": 0.58196
+            },
+            "2026-03": {
+              "rows": 5170,
+              "mae_improvement": 0.055,
+              "log_loss": 0.56924
+            },
+            "2026-04": {
+              "rows": 3130,
+              "mae_improvement": 0.1185,
+              "log_loss": 0.57189
+            },
+            "2026-05": {
+              "rows": 877,
+              "mae_improvement": 0.1358,
+              "log_loss": 0.56901
+            },
+            "2026-06": {
+              "rows": 101,
+              "mae_improvement": 0.1717,
+              "log_loss": 0.57055
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24836,
+              "mae_improvement": 0.0572,
+              "log_loss": 0.57678
+            },
+            "True": {
+              "rows": 3757,
+              "mae_improvement": 0.1096,
+              "log_loss": 0.56179
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1466,
+              "mae_improvement": 0.0791,
+              "log_loss": 0.57393
+            },
+            "True": {
+              "rows": 27127,
+              "mae_improvement": 0.0626,
+              "log_loss": 0.57486
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26546,
+              "mae_improvement": 0.0589,
+              "log_loss": 0.57509
+            },
+            "True": {
+              "rows": 2047,
+              "mae_improvement": 0.1216,
+              "log_loss": 0.57111
+            }
+          }
+        }
+      },
+      "ast": {
+        "accuracy": {
+          "n": 28489,
+          "mae_model": 1.2624,
+          "mae_baseline": 1.3611,
+          "mae_improvement": 0.0725,
+          "rmse_model": 1.7777,
+          "rmse_baseline": 1.8657
+        },
+        "probabilities": {
+          "n_lines": 142965,
+          "n_player_games": 28593,
+          "brier_raw": 0.17601,
+          "log_loss_raw": 0.52549,
+          "ece_raw": 0.0112,
+          "brier_calibrated": 0.17596,
+          "log_loss_calibrated": 0.52542,
+          "ece_calibrated": 0.0052,
+          "log_loss_baseline": 0.56601,
+          "log_loss_model_same_rows": 0.52551,
+          "brier_baseline": 0.18819,
+          "reliability": [
+            {
+              "bin": "0.0-0.1",
+              "n": 22652,
+              "predicted": 0.0613,
+              "observed": 0.0624
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 20927,
+              "predicted": 0.1523,
+              "observed": 0.1539
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 21082,
+              "predicted": 0.246,
+              "observed": 0.2509
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 17366,
+              "predicted": 0.3553,
+              "observed": 0.3496
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 16348,
+              "predicted": 0.4589,
+              "observed": 0.4681
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 11221,
+              "predicted": 0.5548,
+              "observed": 0.5484
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 12810,
+              "predicted": 0.6512,
+              "observed": 0.6449
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 14460,
+              "predicted": 0.7467,
+              "observed": 0.7398
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 6036,
+              "predicted": 0.8472,
+              "observed": 0.8602
+            },
+            {
+              "bin": "0.9-1.0",
+              "n": 63,
+              "predicted": 0.9094,
+              "observed": 0.8889
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28593,
+          "share": [
+            0.1029,
+            0.1079,
+            0.1048,
+            0.0994,
+            0.1002,
+            0.0997,
+            0.0947,
+            0.0991,
+            0.0965,
+            0.0948
+          ],
+          "outer_share": 0.1977,
+          "mean": 0.4901,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2025-10": {
+              "rows": 1791,
+              "mae_improvement": 0.101,
+              "log_loss": 0.52396
+            },
+            "2025-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0589,
+              "log_loss": 0.52238
+            },
+            "2025-12": {
+              "rows": 4226,
+              "mae_improvement": 0.0458,
+              "log_loss": 0.5208
+            },
+            "2026-01": {
+              "rows": 4944,
+              "mae_improvement": 0.0516,
+              "log_loss": 0.52595
+            },
+            "2026-02": {
+              "rows": 3590,
+              "mae_improvement": 0.0561,
+              "log_loss": 0.54107
+            },
+            "2026-03": {
+              "rows": 5170,
+              "mae_improvement": 0.0652,
+              "log_loss": 0.52753
+            },
+            "2026-04": {
+              "rows": 3130,
+              "mae_improvement": 0.1285,
+              "log_loss": 0.5195
+            },
+            "2026-05": {
+              "rows": 877,
+              "mae_improvement": 0.2027,
+              "log_loss": 0.51166
+            },
+            "2026-06": {
+              "rows": 101,
+              "mae_improvement": 0.2643,
+              "log_loss": 0.50073
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24836,
+              "mae_improvement": 0.0694,
+              "log_loss": 0.52672
+            },
+            "True": {
+              "rows": 3757,
+              "mae_improvement": 0.0968,
+              "log_loss": 0.51686
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1466,
+              "mae_improvement": 0.1204,
+              "log_loss": 0.52156
+            },
+            "True": {
+              "rows": 27127,
+              "mae_improvement": 0.0699,
+              "log_loss": 0.52563
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26546,
+              "mae_improvement": 0.0626,
+              "log_loss": 0.52703
+            },
+            "True": {
+              "rows": 2047,
+              "mae_improvement": 0.2012,
+              "log_loss": 0.50454
+            }
+          }
+        }
+      },
+      "fg3m": {
+        "accuracy": {
+          "n": 28489,
+          "mae_model": 0.8156,
+          "mae_baseline": 0.893,
+          "mae_improvement": 0.0866,
+          "rmse_model": 1.2133,
+          "rmse_baseline": 1.2581
+        },
+        "probabilities": {
+          "n_lines": 142965,
+          "n_player_games": 28593,
+          "brier_raw": 0.14516,
+          "log_loss_raw": 0.44228,
+          "ece_raw": 0.015,
+          "brier_calibrated": 0.14479,
+          "log_loss_calibrated": 0.44115,
+          "ece_calibrated": 0.0046,
+          "log_loss_baseline": 0.48074,
+          "log_loss_model_same_rows": 0.44126,
+          "brier_baseline": 0.15615,
+          "reliability": [
+            {
+              "bin": "0.0-0.1",
+              "n": 41934,
+              "predicted": 0.038,
+              "observed": 0.0374
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 22824,
+              "predicted": 0.1443,
+              "observed": 0.1367
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 14765,
+              "predicted": 0.2424,
+              "observed": 0.2427
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 13255,
+              "predicted": 0.3417,
+              "observed": 0.3316
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 13963,
+              "predicted": 0.4373,
+              "observed": 0.4306
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 8602,
+              "predicted": 0.5467,
+              "observed": 0.5399
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 12267,
+              "predicted": 0.6499,
+              "observed": 0.6482
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 8771,
+              "predicted": 0.7449,
+              "observed": 0.7276
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 6584,
+              "predicted": 0.8458,
+              "observed": 0.8454
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28593,
+          "share": [
+            0.1102,
+            0.1089,
+            0.1046,
+            0.0982,
+            0.0963,
+            0.0917,
+            0.0959,
+            0.0918,
+            0.0974,
+            0.1049
+          ],
+          "outer_share": 0.2152,
+          "mean": 0.49,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2025-10": {
+              "rows": 1791,
+              "mae_improvement": 0.1401,
+              "log_loss": 0.44413
+            },
+            "2025-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0722,
+              "log_loss": 0.44289
+            },
+            "2025-12": {
+              "rows": 4226,
+              "mae_improvement": 0.0786,
+              "log_loss": 0.44815
+            },
+            "2026-01": {
+              "rows": 4944,
+              "mae_improvement": 0.063,
+              "log_loss": 0.44258
+            },
+            "2026-02": {
+              "rows": 3590,
+              "mae_improvement": 0.0742,
+              "log_loss": 0.44707
+            },
+            "2026-03": {
+              "rows": 5170,
+              "mae_improvement": 0.0798,
+              "log_loss": 0.43637
+            },
+            "2026-04": {
+              "rows": 3130,
+              "mae_improvement": 0.1207,
+              "log_loss": 0.43437
+            },
+            "2026-05": {
+              "rows": 877,
+              "mae_improvement": 0.1807,
+              "log_loss": 0.41377
+            },
+            "2026-06": {
+              "rows": 101,
+              "mae_improvement": 0.1576,
+              "log_loss": 0.42595
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24836,
+              "mae_improvement": 0.0812,
+              "log_loss": 0.44407
+            },
+            "True": {
+              "rows": 3757,
+              "mae_improvement": 0.1308,
+              "log_loss": 0.42185
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1466,
+              "mae_improvement": 0.101,
+              "log_loss": 0.42475
+            },
+            "True": {
+              "rows": 27127,
+              "mae_improvement": 0.0859,
+              "log_loss": 0.44204
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26546,
+              "mae_improvement": 0.08,
+              "log_loss": 0.44315
+            },
+            "True": {
+              "rows": 2047,
+              "mae_improvement": 0.1736,
+              "log_loss": 0.41526
+            }
+          }
+        }
+      },
+      "pra": {
+        "accuracy": {
+          "n": 28489,
+          "mae_model": 5.74,
+          "mae_baseline": 6.2464,
+          "mae_improvement": 0.0811,
+          "rmse_model": 7.4656,
+          "rmse_baseline": 8.1094
+        },
+        "probabilities": {
+          "n_lines": 142965,
+          "n_player_games": 28593,
+          "brier_raw": 0.24208,
+          "log_loss_raw": 0.67714,
+          "ece_raw": 0.0109,
+          "brier_calibrated": 0.24187,
+          "log_loss_calibrated": 0.67666,
+          "ece_calibrated": 0.006,
+          "log_loss_baseline": 0.73981,
+          "log_loss_model_same_rows": 0.67666,
+          "brier_baseline": 0.2625,
+          "reliability": [
+            {
+              "bin": "0.2-0.3",
+              "n": 3935,
+              "predicted": 0.2803,
+              "observed": 0.2806
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 28485,
+              "predicted": 0.3671,
+              "observed": 0.3639
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 51089,
+              "predicted": 0.4457,
+              "observed": 0.4376
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 56341,
+              "predicted": 0.5477,
+              "observed": 0.5423
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 3115,
+              "predicted": 0.6153,
+              "observed": 0.6327
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28593,
+          "share": [
+            0.1359,
+            0.1027,
+            0.0914,
+            0.09,
+            0.0898,
+            0.0931,
+            0.0943,
+            0.1,
+            0.099,
+            0.1038
+          ],
+          "outer_share": 0.2397,
+          "mean": 0.487,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2025-10": {
+              "rows": 1791,
+              "mae_improvement": 0.0908,
+              "log_loss": 0.67834
+            },
+            "2025-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0485,
+              "log_loss": 0.67567
+            },
+            "2025-12": {
+              "rows": 4226,
+              "mae_improvement": 0.0398,
+              "log_loss": 0.67731
+            },
+            "2026-01": {
+              "rows": 4944,
+              "mae_improvement": 0.0483,
+              "log_loss": 0.67683
+            },
+            "2026-02": {
+              "rows": 3590,
+              "mae_improvement": 0.0697,
+              "log_loss": 0.67997
+            },
+            "2026-03": {
+              "rows": 5170,
+              "mae_improvement": 0.0923,
+              "log_loss": 0.67701
+            },
+            "2026-04": {
+              "rows": 3130,
+              "mae_improvement": 0.1704,
+              "log_loss": 0.67399
+            },
+            "2026-05": {
+              "rows": 877,
+              "mae_improvement": 0.1924,
+              "log_loss": 0.66896
+            },
+            "2026-06": {
+              "rows": 101,
+              "mae_improvement": 0.2353,
+              "log_loss": 0.67127
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24836,
+              "mae_improvement": 0.0774,
+              "log_loss": 0.6774
+            },
+            "True": {
+              "rows": 3757,
+              "mae_improvement": 0.1076,
+              "log_loss": 0.67174
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1466,
+              "mae_improvement": 0.1056,
+              "log_loss": 0.67594
+            },
+            "True": {
+              "rows": 27127,
+              "mae_improvement": 0.0798,
+              "log_loss": 0.6767
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26546,
+              "mae_improvement": 0.0729,
+              "log_loss": 0.67727
+            },
+            "True": {
+              "rows": 2047,
+              "mae_improvement": 0.1804,
+              "log_loss": 0.6687
+            }
+          }
+        }
+      }
+    },
+    "minutes": {
+      "n": 28489,
+      "mae_model": 4.6122,
+      "mae_baseline": 5.2448,
+      "mae_improvement": 0.1206,
+      "coverage_80": 0.8049
+    },
+    "blocks": 34,
+    "targets": {
+      "markets": {
+        "pts": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        },
+        "reb": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        },
+        "ast": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        },
+        "fg3m": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        },
+        "pra": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        }
+      },
+      "passes": true
+    }
+  },
+  "warmup": {
+    "season": "2024-25",
+    "markets": {
+      "pts": {
+        "accuracy": {
+          "n": 28011,
+          "mae_model": 4.4352,
+          "mae_baseline": 4.7055,
+          "mae_improvement": 0.0574,
+          "rmse_model": 5.8646,
+          "rmse_baseline": 6.199
+        },
+        "probabilities": {
+          "n_lines": 140590,
+          "n_player_games": 28118,
+          "brier_raw": 0.23819,
+          "log_loss_raw": 0.66916,
+          "ece_raw": 0.0177,
+          "brier_calibrated": 0.23747,
+          "log_loss_calibrated": 0.66742,
+          "ece_calibrated": 0.0015,
+          "log_loss_baseline": 0.72019,
+          "log_loss_model_same_rows": 0.66746,
+          "brier_baseline": 0.25428,
+          "reliability": [
+            {
+              "bin": "0.0-0.1",
+              "n": 6,
+              "predicted": 0.0825,
+              "observed": 0.0
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 1979,
+              "predicted": 0.1794,
+              "observed": 0.1834
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 7566,
+              "predicted": 0.2602,
+              "observed": 0.2613
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 33410,
+              "predicted": 0.3618,
+              "observed": 0.3624
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 34979,
+              "predicted": 0.4517,
+              "observed": 0.4499
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 43281,
+              "predicted": 0.5471,
+              "observed": 0.5473
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 19163,
+              "predicted": 0.6144,
+              "observed": 0.611
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 186,
+              "predicted": 0.7396,
+              "observed": 0.5376
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 20,
+              "predicted": 0.8219,
+              "observed": 0.6
+            }
+          ],
+          "calibration_failures": [
+            {
+              "bin": "0.7-0.8",
+              "n": 186,
+              "predicted": 0.7396,
+              "observed": 0.5376,
+              "z": 4.64
+            }
+          ]
+        },
+        "pit": {
+          "n": 28118,
+          "share": [
+            0.147,
+            0.095,
+            0.0871,
+            0.0821,
+            0.0863,
+            0.0907,
+            0.0918,
+            0.0979,
+            0.1072,
+            0.1149
+          ],
+          "outer_share": 0.2619,
+          "mean": 0.4928,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2024-10": {
+              "rows": 1592,
+              "mae_improvement": 0.116,
+              "log_loss": 0.6685
+            },
+            "2024-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0316,
+              "log_loss": 0.66719
+            },
+            "2024-12": {
+              "rows": 4016,
+              "mae_improvement": 0.027,
+              "log_loss": 0.6684
+            },
+            "2025-01": {
+              "rows": 4838,
+              "mae_improvement": 0.0404,
+              "log_loss": 0.66562
+            },
+            "2025-02": {
+              "rows": 3738,
+              "mae_improvement": 0.0394,
+              "log_loss": 0.66919
+            },
+            "2025-03": {
+              "rows": 5028,
+              "mae_improvement": 0.0674,
+              "log_loss": 0.66686
+            },
+            "2025-04": {
+              "rows": 3141,
+              "mae_improvement": 0.1064,
+              "log_loss": 0.66778
+            },
+            "2025-05": {
+              "rows": 842,
+              "mae_improvement": 0.1169,
+              "log_loss": 0.66686
+            },
+            "2025-06": {
+              "rows": 159,
+              "mae_improvement": 0.1415,
+              "log_loss": 0.66491
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24272,
+              "mae_improvement": 0.0535,
+              "log_loss": 0.66895
+            },
+            "True": {
+              "rows": 3846,
+              "mae_improvement": 0.0879,
+              "log_loss": 0.65776
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1546,
+              "mae_improvement": 0.0569,
+              "log_loss": 0.66453
+            },
+            "True": {
+              "rows": 26572,
+              "mae_improvement": 0.0575,
+              "log_loss": 0.66759
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26184,
+              "mae_improvement": 0.0528,
+              "log_loss": 0.66772
+            },
+            "True": {
+              "rows": 1934,
+              "mae_improvement": 0.1167,
+              "log_loss": 0.66338
+            }
+          }
+        }
+      },
+      "reb": {
+        "accuracy": {
+          "n": 28011,
+          "mae_model": 1.8255,
+          "mae_baseline": 1.9526,
+          "mae_improvement": 0.0651,
+          "rmse_model": 2.4655,
+          "rmse_baseline": 2.5983
+        },
+        "probabilities": {
+          "n_lines": 140590,
+          "n_player_games": 28118,
+          "brier_raw": 0.19727,
+          "log_loss_raw": 0.5786,
+          "ece_raw": 0.0082,
+          "brier_calibrated": 0.19725,
+          "log_loss_calibrated": 0.57856,
+          "ece_calibrated": 0.0071,
+          "log_loss_baseline": 0.62409,
+          "log_loss_model_same_rows": 0.57849,
+          "brier_baseline": 0.21113,
+          "reliability": [
+            {
+              "bin": "0.0-0.1",
+              "n": 5293,
+              "predicted": 0.0742,
+              "observed": 0.0744
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 20511,
+              "predicted": 0.1545,
+              "observed": 0.1577
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 22292,
+              "predicted": 0.2487,
+              "observed": 0.2429
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 20059,
+              "predicted": 0.3471,
+              "observed": 0.3382
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 18837,
+              "predicted": 0.4492,
+              "observed": 0.4393
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 16493,
+              "predicted": 0.5509,
+              "observed": 0.5411
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 17336,
+              "predicted": 0.6496,
+              "observed": 0.6432
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 13235,
+              "predicted": 0.7444,
+              "observed": 0.7348
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 6187,
+              "predicted": 0.84,
+              "observed": 0.8431
+            },
+            {
+              "bin": "0.9-1.0",
+              "n": 347,
+              "predicted": 0.9101,
+              "observed": 0.8703
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28118,
+          "share": [
+            0.1011,
+            0.1039,
+            0.1004,
+            0.1034,
+            0.1012,
+            0.101,
+            0.096,
+            0.0963,
+            0.0945,
+            0.1022
+          ],
+          "outer_share": 0.2033,
+          "mean": 0.4953,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2024-10": {
+              "rows": 1592,
+              "mae_improvement": 0.1294,
+              "log_loss": 0.57406
+            },
+            "2024-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0543,
+              "log_loss": 0.57795
+            },
+            "2024-12": {
+              "rows": 4016,
+              "mae_improvement": 0.042,
+              "log_loss": 0.57684
+            },
+            "2025-01": {
+              "rows": 4838,
+              "mae_improvement": 0.0476,
+              "log_loss": 0.57383
+            },
+            "2025-02": {
+              "rows": 3738,
+              "mae_improvement": 0.0532,
+              "log_loss": 0.58364
+            },
+            "2025-03": {
+              "rows": 5028,
+              "mae_improvement": 0.0694,
+              "log_loss": 0.57866
+            },
+            "2025-04": {
+              "rows": 3141,
+              "mae_improvement": 0.0868,
+              "log_loss": 0.5862
+            },
+            "2025-05": {
+              "rows": 842,
+              "mae_improvement": 0.1245,
+              "log_loss": 0.57497
+            },
+            "2025-06": {
+              "rows": 159,
+              "mae_improvement": 0.1621,
+              "log_loss": 0.57398
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24272,
+              "mae_improvement": 0.06,
+              "log_loss": 0.57996
+            },
+            "True": {
+              "rows": 3846,
+              "mae_improvement": 0.1009,
+              "log_loss": 0.56968
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1546,
+              "mae_improvement": 0.079,
+              "log_loss": 0.57536
+            },
+            "True": {
+              "rows": 26572,
+              "mae_improvement": 0.0642,
+              "log_loss": 0.57874
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26184,
+              "mae_improvement": 0.0607,
+              "log_loss": 0.57905
+            },
+            "True": {
+              "rows": 1934,
+              "mae_improvement": 0.1224,
+              "log_loss": 0.57187
+            }
+          }
+        }
+      },
+      "ast": {
+        "accuracy": {
+          "n": 28011,
+          "mae_model": 1.2595,
+          "mae_baseline": 1.3536,
+          "mae_improvement": 0.0695,
+          "rmse_model": 1.7781,
+          "rmse_baseline": 1.8633
+        },
+        "probabilities": {
+          "n_lines": 140590,
+          "n_player_games": 28118,
+          "brier_raw": 0.17471,
+          "log_loss_raw": 0.52249,
+          "ece_raw": 0.0131,
+          "brier_calibrated": 0.17468,
+          "log_loss_calibrated": 0.52247,
+          "ece_calibrated": 0.006,
+          "log_loss_baseline": 0.5611,
+          "log_loss_model_same_rows": 0.52267,
+          "brier_baseline": 0.1862,
+          "reliability": [
+            {
+              "bin": "0.0-0.1",
+              "n": 21801,
+              "predicted": 0.0599,
+              "observed": 0.0596
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 20676,
+              "predicted": 0.1513,
+              "observed": 0.1492
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 19903,
+              "predicted": 0.245,
+              "observed": 0.2404
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 14270,
+              "predicted": 0.3466,
+              "observed": 0.3406
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 18402,
+              "predicted": 0.4456,
+              "observed": 0.4347
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 11344,
+              "predicted": 0.5574,
+              "observed": 0.5436
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 13356,
+              "predicted": 0.6545,
+              "observed": 0.6488
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 14180,
+              "predicted": 0.7522,
+              "observed": 0.7432
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 6404,
+              "predicted": 0.8421,
+              "observed": 0.8332
+            },
+            {
+              "bin": "0.9-1.0",
+              "n": 254,
+              "predicted": 0.9092,
+              "observed": 0.9252
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28118,
+          "share": [
+            0.1071,
+            0.1029,
+            0.1038,
+            0.1019,
+            0.1022,
+            0.0986,
+            0.0983,
+            0.0969,
+            0.0953,
+            0.093
+          ],
+          "outer_share": 0.2001,
+          "mean": 0.4884,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2024-10": {
+              "rows": 1592,
+              "mae_improvement": 0.1504,
+              "log_loss": 0.52151
+            },
+            "2024-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0532,
+              "log_loss": 0.51654
+            },
+            "2024-12": {
+              "rows": 4016,
+              "mae_improvement": 0.0526,
+              "log_loss": 0.52466
+            },
+            "2025-01": {
+              "rows": 4838,
+              "mae_improvement": 0.0552,
+              "log_loss": 0.52054
+            },
+            "2025-02": {
+              "rows": 3738,
+              "mae_improvement": 0.0503,
+              "log_loss": 0.52935
+            },
+            "2025-03": {
+              "rows": 5028,
+              "mae_improvement": 0.0486,
+              "log_loss": 0.52968
+            },
+            "2025-04": {
+              "rows": 3141,
+              "mae_improvement": 0.1071,
+              "log_loss": 0.51463
+            },
+            "2025-05": {
+              "rows": 842,
+              "mae_improvement": 0.1866,
+              "log_loss": 0.52087
+            },
+            "2025-06": {
+              "rows": 159,
+              "mae_improvement": 0.2496,
+              "log_loss": 0.4866
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24272,
+              "mae_improvement": 0.0663,
+              "log_loss": 0.52463
+            },
+            "True": {
+              "rows": 3846,
+              "mae_improvement": 0.0934,
+              "log_loss": 0.50881
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1546,
+              "mae_improvement": 0.1033,
+              "log_loss": 0.5205
+            },
+            "True": {
+              "rows": 26572,
+              "mae_improvement": 0.0674,
+              "log_loss": 0.52258
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26184,
+              "mae_improvement": 0.0612,
+              "log_loss": 0.52352
+            },
+            "True": {
+              "rows": 1934,
+              "mae_improvement": 0.1785,
+              "log_loss": 0.50822
+            }
+          }
+        }
+      },
+      "fg3m": {
+        "accuracy": {
+          "n": 28011,
+          "mae_model": 0.8231,
+          "mae_baseline": 0.8954,
+          "mae_improvement": 0.0807,
+          "rmse_model": 1.2311,
+          "rmse_baseline": 1.2754
+        },
+        "probabilities": {
+          "n_lines": 140590,
+          "n_player_games": 28118,
+          "brier_raw": 0.14457,
+          "log_loss_raw": 0.44081,
+          "ece_raw": 0.0124,
+          "brier_calibrated": 0.14448,
+          "log_loss_calibrated": 0.44037,
+          "ece_calibrated": 0.0069,
+          "log_loss_baseline": 0.479,
+          "log_loss_model_same_rows": 0.44071,
+          "brier_baseline": 0.15492,
+          "reliability": [
+            {
+              "bin": "0.0-0.1",
+              "n": 43433,
+              "predicted": 0.0368,
+              "observed": 0.0408
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 20737,
+              "predicted": 0.1456,
+              "observed": 0.1517
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 15462,
+              "predicted": 0.2434,
+              "observed": 0.2404
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 12111,
+              "predicted": 0.344,
+              "observed": 0.3429
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 12226,
+              "predicted": 0.4418,
+              "observed": 0.4297
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 8846,
+              "predicted": 0.5467,
+              "observed": 0.5345
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 10097,
+              "predicted": 0.6472,
+              "observed": 0.6407
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 9533,
+              "predicted": 0.7492,
+              "observed": 0.7283
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 7294,
+              "predicted": 0.8436,
+              "observed": 0.8366
+            },
+            {
+              "bin": "0.9-1.0",
+              "n": 851,
+              "predicted": 0.9181,
+              "observed": 0.879
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28118,
+          "share": [
+            0.1105,
+            0.104,
+            0.0996,
+            0.0991,
+            0.0966,
+            0.0946,
+            0.0923,
+            0.0959,
+            0.0964,
+            0.1112
+          ],
+          "outer_share": 0.2217,
+          "mean": 0.4957,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2024-10": {
+              "rows": 1592,
+              "mae_improvement": 0.1451,
+              "log_loss": 0.45526
+            },
+            "2024-11": {
+              "rows": 4764,
+              "mae_improvement": 0.0707,
+              "log_loss": 0.44285
+            },
+            "2024-12": {
+              "rows": 4016,
+              "mae_improvement": 0.0765,
+              "log_loss": 0.43868
+            },
+            "2025-01": {
+              "rows": 4838,
+              "mae_improvement": 0.0709,
+              "log_loss": 0.42822
+            },
+            "2025-02": {
+              "rows": 3738,
+              "mae_improvement": 0.0646,
+              "log_loss": 0.44223
+            },
+            "2025-03": {
+              "rows": 5028,
+              "mae_improvement": 0.0664,
+              "log_loss": 0.44683
+            },
+            "2025-04": {
+              "rows": 3141,
+              "mae_improvement": 0.1016,
+              "log_loss": 0.43991
+            },
+            "2025-05": {
+              "rows": 842,
+              "mae_improvement": 0.1462,
+              "log_loss": 0.43046
+            },
+            "2025-06": {
+              "rows": 159,
+              "mae_improvement": 0.1458,
+              "log_loss": 0.44341
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24272,
+              "mae_improvement": 0.0732,
+              "log_loss": 0.44531
+            },
+            "True": {
+              "rows": 3846,
+              "mae_improvement": 0.1426,
+              "log_loss": 0.4092
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1546,
+              "mae_improvement": 0.0983,
+              "log_loss": 0.43556
+            },
+            "True": {
+              "rows": 26572,
+              "mae_improvement": 0.0796,
+              "log_loss": 0.44065
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26184,
+              "mae_improvement": 0.0757,
+              "log_loss": 0.4411
+            },
+            "True": {
+              "rows": 1934,
+              "mae_improvement": 0.1461,
+              "log_loss": 0.43053
+            }
+          }
+        }
+      },
+      "pra": {
+        "accuracy": {
+          "n": 28011,
+          "mae_model": 5.7904,
+          "mae_baseline": 6.2551,
+          "mae_improvement": 0.0743,
+          "rmse_model": 7.5336,
+          "rmse_baseline": 8.1202
+        },
+        "probabilities": {
+          "n_lines": 140590,
+          "n_player_games": 28118,
+          "brier_raw": 0.2422,
+          "log_loss_raw": 0.67738,
+          "ece_raw": 0.0093,
+          "brier_calibrated": 0.24208,
+          "log_loss_calibrated": 0.67707,
+          "ece_calibrated": 0.002,
+          "log_loss_baseline": 0.73985,
+          "log_loss_model_same_rows": 0.6771,
+          "brier_baseline": 0.26234,
+          "reliability": [
+            {
+              "bin": "0.0-0.1",
+              "n": 2,
+              "predicted": 0.0872,
+              "observed": 0.0
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 44,
+              "predicted": 0.1655,
+              "observed": 0.1818
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 4303,
+              "predicted": 0.2714,
+              "observed": 0.2775
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 28207,
+              "predicted": 0.3662,
+              "observed": 0.3691
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 49533,
+              "predicted": 0.4459,
+              "observed": 0.4469
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 53597,
+              "predicted": 0.5488,
+              "observed": 0.5483
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 4708,
+              "predicted": 0.6142,
+              "observed": 0.5964
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 168,
+              "predicted": 0.741,
+              "observed": 0.6726
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 28,
+              "predicted": 0.8154,
+              "observed": 0.5714
+            }
+          ],
+          "calibration_failures": []
+        },
+        "pit": {
+          "n": 28118,
+          "share": [
+            0.1354,
+            0.1012,
+            0.0896,
+            0.0885,
+            0.09,
+            0.0902,
+            0.0929,
+            0.0983,
+            0.1027,
+            0.1112
+          ],
+          "outer_share": 0.2466,
+          "mean": 0.4921,
+          "verdict": "flat: the distribution's shape is right"
+        },
+        "breakdowns": {
+          "month": {
+            "2024-10": {
+              "rows": 1592,
+              "mae_improvement": 0.1209,
+              "log_loss": 0.67498
+            },
+            "2024-11": {
+              "rows": 4764,
+              "mae_improvement": 0.039,
+              "log_loss": 0.67816
+            },
+            "2024-12": {
+              "rows": 4016,
+              "mae_improvement": 0.0309,
+              "log_loss": 0.677
+            },
+            "2025-01": {
+              "rows": 4838,
+              "mae_improvement": 0.0558,
+              "log_loss": 0.67573
+            },
+            "2025-02": {
+              "rows": 3738,
+              "mae_improvement": 0.0586,
+              "log_loss": 0.68008
+            },
+            "2025-03": {
+              "rows": 5028,
+              "mae_improvement": 0.0902,
+              "log_loss": 0.67647
+            },
+            "2025-04": {
+              "rows": 3141,
+              "mae_improvement": 0.14,
+              "log_loss": 0.6761
+            },
+            "2025-05": {
+              "rows": 842,
+              "mae_improvement": 0.1362,
+              "log_loss": 0.67795
+            },
+            "2025-06": {
+              "rows": 159,
+              "mae_improvement": 0.2059,
+              "log_loss": 0.67072
+            }
+          },
+          "low_confidence": {
+            "False": {
+              "rows": 24272,
+              "mae_improvement": 0.0697,
+              "log_loss": 0.67853
+            },
+            "True": {
+              "rows": 3846,
+              "mae_improvement": 0.1076,
+              "log_loss": 0.66786
+            }
+          },
+          "roster_change": {
+            "False": {
+              "rows": 1546,
+              "mae_improvement": 0.0767,
+              "log_loss": 0.67818
+            },
+            "True": {
+              "rows": 26572,
+              "mae_improvement": 0.0741,
+              "log_loss": 0.67701
+            }
+          },
+          "postseason": {
+            "False": {
+              "rows": 26184,
+              "mae_improvement": 0.069,
+              "log_loss": 0.67739
+            },
+            "True": {
+              "rows": 1934,
+              "mae_improvement": 0.141,
+              "log_loss": 0.67273
+            }
+          }
+        }
+      }
+    },
+    "minutes": {
+      "n": 28011,
+      "mae_model": 4.5946,
+      "mae_baseline": 5.2431,
+      "mae_improvement": 0.1237,
+      "coverage_80": 0.7996
+    },
+    "blocks": 35,
+    "targets": {
+      "markets": {
+        "pts": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": false,
+          "passes": false
+        },
+        "reb": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        },
+        "ast": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        },
+        "fg3m": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        },
+        "pra": {
+          "beats_baseline_mae": true,
+          "ece_under_target": true,
+          "no_decile_failures": true,
+          "passes": true
+        }
+      },
+      "passes": false
+    }
+  },
+  "blocks": [
+    {
+      "block": "2025-10-21",
+      "train_rows": 84055,
+      "rows": 1197,
+      "trained_through": "2025-06-22",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 320,
+        "0.5": 590,
+        "0.9": 559
+      },
+      "rate_rounds": {
+        "pts": 365,
+        "reb": 371,
+        "ast": 500,
+        "fg3m": 658
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-10-28",
+      "train_rows": 85252,
+      "rows": 1096,
+      "trained_through": "2025-10-27",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 348,
+        "0.5": 662,
+        "0.9": 790
+      },
+      "rate_rounds": {
+        "pts": 414,
+        "reb": 302,
+        "ast": 485,
+        "fg3m": 476
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-11-04",
+      "train_rows": 86348,
+      "rows": 1173,
+      "trained_through": "2025-11-03",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 418,
+        "0.5": 707,
+        "0.9": 794
+      },
+      "rate_rounds": {
+        "pts": 496,
+        "reb": 0,
+        "ast": 697,
+        "fg3m": 372
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-11-11",
+      "train_rows": 87521,
+      "rows": 1119,
+      "trained_through": "2025-11-10",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 289,
+        "0.5": 737,
+        "0.9": 560
+      },
+      "rate_rounds": {
+        "pts": 498,
+        "reb": 297,
+        "ast": 417,
+        "fg3m": 481
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-11-18",
+      "train_rows": 88640,
+      "rows": 1144,
+      "trained_through": "2025-11-17",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 348,
+        "0.5": 845,
+        "0.9": 687
+      },
+      "rate_rounds": {
+        "pts": 521,
+        "reb": 395,
+        "ast": 574,
+        "fg3m": 602
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-11-25",
+      "train_rows": 89784,
+      "rows": 1018,
+      "trained_through": "2025-11-24",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 395,
+        "0.5": 844,
+        "0.9": 756
+      },
+      "rate_rounds": {
+        "pts": 414,
+        "reb": 246,
+        "ast": 486,
+        "fg3m": 563
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-12-02",
+      "train_rows": 90802,
+      "rows": 1069,
+      "trained_through": "2025-12-01",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 359,
+        "0.5": 911,
+        "0.9": 503
+      },
+      "rate_rounds": {
+        "pts": 487,
+        "reb": 0,
+        "ast": 431,
+        "fg3m": 459
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-12-09",
+      "train_rows": 91871,
+      "rows": 590,
+      "trained_through": "2025-12-08",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 421,
+        "0.5": 766,
+        "0.9": 631
+      },
+      "rate_rounds": {
+        "pts": 500,
+        "reb": 0,
+        "ast": 382,
+        "fg3m": 418
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-12-16",
+      "train_rows": 92461,
+      "rows": 885,
+      "trained_through": "2025-12-15",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 545,
+        "0.5": 984,
+        "0.9": 497
+      },
+      "rate_rounds": {
+        "pts": 505,
+        "reb": 0,
+        "ast": 554,
+        "fg3m": 467
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-12-23",
+      "train_rows": 93346,
+      "rows": 1207,
+      "trained_through": "2025-12-22",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 399,
+        "0.5": 626,
+        "0.9": 539
+      },
+      "rate_rounds": {
+        "pts": 508,
+        "reb": 0,
+        "ast": 449,
+        "fg3m": 407
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2025-12-30",
+      "train_rows": 94553,
+      "rows": 1102,
+      "trained_through": "2025-12-29",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 406,
+        "0.5": 870,
+        "0.9": 696
+      },
+      "rate_rounds": {
+        "pts": 514,
+        "reb": 0,
+        "ast": 556,
+        "fg3m": 430
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-01-06",
+      "train_rows": 95655,
+      "rows": 1133,
+      "trained_through": "2026-01-05",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 502,
+        "0.5": 796,
+        "0.9": 603
+      },
+      "rate_rounds": {
+        "pts": 510,
+        "reb": 0,
+        "ast": 607,
+        "fg3m": 343
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-01-13",
+      "train_rows": 96788,
+      "rows": 1111,
+      "trained_through": "2026-01-12",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 443,
+        "0.5": 648,
+        "0.9": 572
+      },
+      "rate_rounds": {
+        "pts": 509,
+        "reb": 0,
+        "ast": 422,
+        "fg3m": 350
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-01-20",
+      "train_rows": 97899,
+      "rows": 1042,
+      "trained_through": "2026-01-19",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 459,
+        "0.5": 690,
+        "0.9": 553
+      },
+      "rate_rounds": {
+        "pts": 572,
+        "reb": 0,
+        "ast": 422,
+        "fg3m": 263
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-01-27",
+      "train_rows": 98941,
+      "rows": 1154,
+      "trained_through": "2026-01-26",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 485,
+        "0.5": 760,
+        "0.9": 504
+      },
+      "rate_rounds": {
+        "pts": 602,
+        "reb": 0,
+        "ast": 452,
+        "fg3m": 255
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-02-03",
+      "train_rows": 100095,
+      "rows": 1168,
+      "trained_through": "2026-02-02",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 602,
+        "0.5": 718,
+        "0.9": 565
+      },
+      "rate_rounds": {
+        "pts": 469,
+        "reb": 0,
+        "ast": 381,
+        "fg3m": 263
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-02-10",
+      "train_rows": 101263,
+      "rows": 459,
+      "trained_through": "2026-02-09",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 413,
+        "0.5": 612,
+        "0.9": 572
+      },
+      "rate_rounds": {
+        "pts": 328,
+        "reb": 0,
+        "ast": 518,
+        "fg3m": 344
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-02-17",
+      "train_rows": 101722,
+      "rows": 841,
+      "trained_through": "2026-02-12",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 407,
+        "0.5": 394,
+        "0.9": 514
+      },
+      "rate_rounds": {
+        "pts": 539,
+        "reb": 0,
+        "ast": 372,
+        "fg3m": 310
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-02-24",
+      "train_rows": 102563,
+      "rows": 1138,
+      "trained_through": "2026-02-23",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 424,
+        "0.5": 393,
+        "0.9": 314
+      },
+      "rate_rounds": {
+        "pts": 386,
+        "reb": 0,
+        "ast": 412,
+        "fg3m": 270
+      },
+      "calibrated_markets": [
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-03-03",
+      "train_rows": 103701,
+      "rows": 1159,
+      "trained_through": "2026-03-02",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 395,
+        "0.5": 524,
+        "0.9": 333
+      },
+      "rate_rounds": {
+        "pts": 622,
+        "reb": 0,
+        "ast": 380,
+        "fg3m": 242
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-03-10",
+      "train_rows": 104860,
+      "rows": 1189,
+      "trained_through": "2026-03-09",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 530,
+        "0.5": 504,
+        "0.9": 422
+      },
+      "rate_rounds": {
+        "pts": 501,
+        "reb": 400,
+        "ast": 546,
+        "fg3m": 323
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-03-17",
+      "train_rows": 106049,
+      "rows": 1213,
+      "trained_through": "2026-03-16",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 391,
+        "0.5": 526,
+        "0.9": 469
+      },
+      "rate_rounds": {
+        "pts": 411,
+        "reb": 404,
+        "ast": 367,
+        "fg3m": 402
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-03-24",
+      "train_rows": 107262,
+      "rows": 1112,
+      "trained_through": "2026-03-23",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 434,
+        "0.5": 638,
+        "0.9": 399
+      },
+      "rate_rounds": {
+        "pts": 601,
+        "reb": 236,
+        "ast": 330,
+        "fg3m": 293
+      },
+      "calibrated_markets": [
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-03-31",
+      "train_rows": 108374,
+      "rows": 1095,
+      "trained_through": "2026-03-30",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 363,
+        "0.5": 449,
+        "0.9": 556
+      },
+      "rate_rounds": {
+        "pts": 549,
+        "reb": 364,
+        "ast": 390,
+        "fg3m": 422
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-04-07",
+      "train_rows": 109469,
+      "rows": 1132,
+      "trained_through": "2026-04-06",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 317,
+        "0.5": 591,
+        "0.9": 257
+      },
+      "rate_rounds": {
+        "pts": 661,
+        "reb": 365,
+        "ast": 422,
+        "fg3m": 397
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-04-14",
+      "train_rows": 110601,
+      "rows": 363,
+      "trained_through": "2026-04-12",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 353,
+        "0.5": 547,
+        "0.9": 411
+      },
+      "rate_rounds": {
+        "pts": 611,
+        "reb": 313,
+        "ast": 380,
+        "fg3m": 387
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-04-21",
+      "train_rows": 110964,
+      "rows": 501,
+      "trained_through": "2026-04-20",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 322,
+        "0.5": 640,
+        "0.9": 373
+      },
+      "rate_rounds": {
+        "pts": 578,
+        "reb": 351,
+        "ast": 486,
+        "fg3m": 504
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts"
+      ]
+    },
+    {
+      "block": "2026-04-28",
+      "train_rows": 111465,
+      "rows": 375,
+      "trained_through": "2026-04-27",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 400,
+        "0.5": 644,
+        "0.9": 557
+      },
+      "rate_rounds": {
+        "pts": 613,
+        "reb": 445,
+        "ast": 377,
+        "fg3m": 328
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-05-05",
+      "train_rows": 111840,
+      "rows": 321,
+      "trained_through": "2026-05-04",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 436,
+        "0.5": 680,
+        "0.9": 502
+      },
+      "rate_rounds": {
+        "pts": 523,
+        "reb": 461,
+        "ast": 602,
+        "fg3m": 453
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-05-12",
+      "train_rows": 112161,
+      "rows": 147,
+      "trained_through": "2026-05-11",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 410,
+        "0.5": 624,
+        "0.9": 427
+      },
+      "rate_rounds": {
+        "pts": 512,
+        "reb": 427,
+        "ast": 381,
+        "fg3m": 410
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-05-19",
+      "train_rows": 112308,
+      "rows": 166,
+      "trained_through": "2026-05-18",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 407,
+        "0.5": 803,
+        "0.9": 394
+      },
+      "rate_rounds": {
+        "pts": 753,
+        "reb": 577,
+        "ast": 737,
+        "fg3m": 601
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-05-26",
+      "train_rows": 112474,
+      "rows": 73,
+      "trained_through": "2026-05-25",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 333,
+        "0.5": 603,
+        "0.9": 556
+      },
+      "rate_rounds": {
+        "pts": 668,
+        "reb": 538,
+        "ast": 474,
+        "fg3m": 407
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-06-02",
+      "train_rows": 112547,
+      "rows": 59,
+      "trained_through": "2026-05-30",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 379,
+        "0.5": 832,
+        "0.9": 555
+      },
+      "rate_rounds": {
+        "pts": 653,
+        "reb": 532,
+        "ast": 484,
+        "fg3m": 447
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    },
+    {
+      "block": "2026-06-09",
+      "train_rows": 112606,
+      "rows": 42,
+      "trained_through": "2026-06-08",
+      "cached": false,
+      "minutes_rounds": {
+        "0.1": 323,
+        "0.5": 553,
+        "0.9": 379
+      },
+      "rate_rounds": {
+        "pts": 814,
+        "reb": 418,
+        "ast": 440,
+        "fg3m": 387
+      },
+      "calibrated_markets": [
+        "ast",
+        "fg3m",
+        "pra",
+        "pts",
+        "reb"
+      ]
+    }
+  ]
+}

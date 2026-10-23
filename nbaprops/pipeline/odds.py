@@ -16,6 +16,7 @@ Unibet, but Pinnacle only for NBA game lines. The prop reference price is theref
 consensus of the non-DraftKings books; Pinnacle feeds spreads and totals.
 """
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -101,6 +102,16 @@ def parse_events(payload: list[dict[str, Any]]) -> list[EventInfo]:
     ]
 
 
+_MILESTONE_NAME = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*\+")
+
+
+def _milestone_point(outcome: dict[str, Any]) -> float | None:
+    """DraftKings (and FanDuel, Unibet) send milestone rungs with an empty point and the
+    threshold in the name ("20+ Points", "3+ Assists"): N+ is the point N."""
+    m = _MILESTONE_NAME.match(outcome.get("name") or "")
+    return float(m.group(1)) if m else None
+
+
 def _normalize_line(point: float, line_type: str) -> float:
     """A milestone "N+" (point N, integer) is the same bet as over N - 0.5."""
     if line_type == "milestone" and float(point).is_integer():
@@ -123,14 +134,17 @@ def parse_props(payload: dict[str, Any]) -> list[PropQuote]:
                 continue  # off the board: last prices are stale
             line_type = market.get("line_type") or "main"
             for o in market.get("outcomes", []):
-                if o.get("point") is None or o.get("price") is None:
+                point = o.get("point")
+                if point is None and line_type == "milestone":
+                    point = _milestone_point(o)
+                if point is None or o.get("price") is None:
                     continue
                 name = strip_team_suffix(o.get("description") or "")
                 if not name:
                     continue
                 pid = parse_provider_player_id(o.get("player_id"))
                 player_key = pid if pid is not None else normalize_name(name)
-                line = _normalize_line(o["point"], line_type)
+                line = _normalize_line(point, line_type)
                 key = (book_key, player_key, ours, line_type, line)
                 side = (o.get("name") or "").lower()
                 if side not in ("over", "under"):
