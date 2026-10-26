@@ -139,12 +139,18 @@ POSTPONED_AFTER = timedelta(hours=36)  # DraftKings voids bets on games that are
 
 def void_unplayed(session, now: datetime, res: "SettleResult") -> None:
     """Picks on games still not final well after their scheduled tip (postponed or
-    suspended) are void, as DraftKings settles them."""
+    suspended) are void, as DraftKings settles them. A game only counts as unplayed once
+    later games' stats are in while it still has none: a game whose stats simply haven't
+    been loaded yet (a missed morning) waits. Before that check, two days without
+    `stats-day` voided every pick on perfectly normal games."""
     ids = (
         session.execute(
             text("""
         SELECT p.pick_id FROM picks p JOIN games g USING (game_id)
-        WHERE p.result IS NULL AND g.status <> 'final' AND g.tip_time < :cut"""),
+        WHERE p.result IS NULL AND g.status <> 'final' AND g.tip_time < :cut
+          AND NOT EXISTS (SELECT 1 FROM player_game_logs l WHERE l.game_id = g.game_id)
+          AND EXISTS (SELECT 1 FROM player_game_logs l2 JOIN games g2 ON g2.game_id = l2.game_id
+                      WHERE g2.game_date > g.game_date + 1)"""),
             {"cut": now - POSTPONED_AFTER},
         )
         .scalars()
@@ -156,6 +162,46 @@ def void_unplayed(session, now: datetime, res: "SettleResult") -> None:
         res.picks += 1
         res.record["void"] += 1
     session.flush()
+
+
+def unvoid_missing_stats(session) -> tuple[int, int]:
+    """Reopen picks voided only because their game's stats weren't loaded yet (the old
+    36-hour rule), and the parlays they're in. A real did-not-play void needs the game's
+    stats, so it is never touched; a real postponement gets voided again by the current
+    rule once later games' stats are in."""
+    ids = list(
+        session.execute(
+            text("""
+        SELECT p.pick_id FROM picks p
+        WHERE p.result = 'void'
+          AND NOT EXISTS (SELECT 1 FROM player_game_logs l WHERE l.game_id = p.game_id)""")
+        )
+        .scalars()
+        .all()
+    )
+    if not ids:
+        return 0, 0
+    pars = list(
+        session.execute(
+            text("""
+        SELECT DISTINCT l.parlay_id FROM parlay_legs l JOIN parlays p USING (parlay_id)
+        WHERE l.pick_id = ANY(:ids) AND p.result IS NOT NULL"""),
+            {"ids": ids},
+        )
+        .scalars()
+        .all()
+    )
+    session.execute(
+        text("""UPDATE picks SET result = NULL, pnl = NULL, closing_price = NULL,
+                            clv = NULL WHERE pick_id = ANY(:ids)"""),
+        {"ids": ids},
+    )
+    if pars:
+        session.execute(
+            text("UPDATE parlays SET result = NULL, pnl = NULL WHERE parlay_id = ANY(:p)"),
+            {"p": pars},
+        )
+    return len(ids), len(pars)
 
 
 def settle(session, today: date, now: datetime) -> SettleResult:

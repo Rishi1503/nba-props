@@ -296,7 +296,44 @@ def test_clv_is_read_across_when_the_market_moves_past_the_line():
 
 
 @pytest.mark.db
+def _a_later_game_with_stats(days_after: int = 2) -> None:
+    """Stats loading is working: a game days after G3 has its box score."""
+    from datetime import UTC, datetime
+
+    from nbaprops.db.models import Game
+
+    d = DAY + timedelta(days=days_after)
+    with session_scope() as s:
+        s.add(
+            Game(
+                game_id="0022600099",
+                season="2026-27",
+                season_type="regular",
+                game_date=d,
+                tip_time=datetime(d.year, d.month, d.day, 23, 0, tzinfo=UTC),
+                home_team_id=1610612765,
+                away_team_id=1610612738,
+                status="final",
+            )
+        )
+        s.flush()
+        s.add(
+            PlayerGameLog(
+                game_id="0022600099",
+                player_id=CADE,
+                team_id=1610612765,
+                minutes=30,
+                pts=20,
+                reb=4,
+                ast=6,
+                fg3m=2,
+            )
+        )
+
+
 def test_picks_on_a_game_that_never_finished_are_voided():
+    """G3 never becomes final. It's only treated as unplayed once later games' stats are in:
+    without them (a missed morning of `stats-day`), its pick waits instead of being voided."""
     from tests.test_slate import TIP1
 
     settle_setup()  # G3 (Wembanyama's game) never became final
@@ -305,7 +342,50 @@ def test_picks_on_a_game_that_never_finished_are_voided():
         assert s.scalars(select(Pick).where(Pick.player_id == WEMBY)).one().result is None
     with session_scope() as s:
         # G3 tips 6.5 hours after G1, so 44 hours after G1's tip is 37.5 after G3's
-        later = settle(s, NEXT_DAY + timedelta(days=1), TIP1 + timedelta(hours=44))
+        waiting = settle(s, NEXT_DAY + timedelta(days=1), TIP1 + timedelta(hours=44))
+        assert s.scalars(select(Pick).where(Pick.player_id == WEMBY)).one().result is None
+    _a_later_game_with_stats()
+    with session_scope() as s:
+        later = settle(s, NEXT_DAY + timedelta(days=2), TIP1 + timedelta(hours=68))
         wemby = s.scalars(select(Pick).where(Pick.player_id == WEMBY)).one()
         assert wemby.result == "void" and float(wemby.pnl) == 0
-    assert early.record["void"] == 1 and later.record["void"] == 1  # Duren, then Wembanyama
+    assert early.record["void"] == 1  # Duren (did not play in a loaded box score)
+    assert waiting.record["void"] == 0 and later.record["void"] == 1  # then Wembanyama
+
+
+def test_voids_made_only_for_missing_stats_are_reopened():
+    """The bug: two days without `stats-day` and the old 36-hour rule voided every pick on
+    normal games. The repair reopens exactly those picks and their parlays, and never a real
+    did-not-play void (that one needs the game's box score)."""
+    from nbaprops.ops.settle import unvoid_missing_stats
+    from tests.test_slate import TIP1
+
+    settle_setup()
+    with session_scope() as s:
+        settle(s, NEXT_DAY, TIP1 + timedelta(hours=20))  # Duren: a real void (G1 is loaded)
+        wemby = s.scalars(select(Pick).where(Pick.player_id == WEMBY)).one()
+        wemby.result, wemby.pnl = "void", Decimal("0")  # what the old rule did
+        par = Parlay(
+            created_ts=NOW,
+            slate_date=DAY,
+            tier="satellite",
+            mode="paper",
+            same_game=False,
+            joint_prob=Decimal("0.3"),
+            dk_price=250,
+            ev=Decimal("0.05"),
+            stake=Decimal("5"),
+            result="void",
+            pnl=Decimal("0"),
+        )
+        s.add(par)
+        s.flush()
+        s.add(ParlayLeg(parlay_id=par.parlay_id, pick_id=wemby.pick_id))
+        par_id = par.parlay_id
+    with session_scope() as s:
+        assert unvoid_missing_stats(s) == (1, 1)
+    with session_scope() as s:
+        assert s.scalars(select(Pick).where(Pick.player_id == WEMBY)).one().result is None
+        assert s.get(Parlay, par_id).result is None
+        voids = s.scalars(select(Pick.result).where(Pick.result == "void")).all()
+        assert voids == ["void"]  # Duren's real void stays

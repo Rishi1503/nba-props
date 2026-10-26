@@ -1,0 +1,240 @@
+{
+  "review": {
+    "week_ending": "2026-10-25",
+    "mode": "paper",
+    "week": {
+      "bets": 0,
+      "voided": 7
+    },
+    "season": {
+      "bets": 0,
+      "voided": 7
+    },
+    "weekly_clv": [
+      {
+        "week": "2026-09-28 to 2026-10-04",
+        "bets": 0,
+        "avg_clv": null
+      },
+      {
+        "week": "2026-10-05 to 2026-10-11",
+        "bets": 0,
+        "avg_clv": null
+      },
+      {
+        "week": "2026-10-12 to 2026-10-18",
+        "bets": 0,
+        "avg_clv": null
+      },
+      {
+        "week": "2026-10-19 to 2026-10-25",
+        "bets": 0,
+        "avg_clv": null
+      }
+    ],
+    "week_splits": {
+      "by_market": {
+        "ast": {
+          "bets": 0,
+          "voided": 4
+        },
+        "fg3m": {
+          "bets": 0,
+          "voided": 1
+        },
+        "pra": {
+          "bets": 0,
+          "voided": 1
+        },
+        "pts": {
+          "bets": 0,
+          "voided": 1
+        }
+      },
+      "by_flag_time": {
+        "3 PM": {
+          "bets": 0,
+          "voided": 6
+        },
+        "6 PM": {
+          "bets": 0,
+          "voided": 1
+        }
+      },
+      "by_side": {
+        "over": {
+          "bets": 0,
+          "voided": 2
+        },
+        "under": {
+          "bets": 0,
+          "voided": 5
+        }
+      },
+      "by_tier": {
+        "high_conf": {
+          "bets": 0,
+          "voided": 3
+        },
+        "standard": {
+          "bets": 0,
+          "voided": 4
+        }
+      },
+      "by_source": {
+        "consensus": {
+          "bets": 0,
+          "voided": 6
+        },
+        "model-only": {
+          "bets": 0,
+          "voided": 1
+        }
+      },
+      "ev_vs_clv": {
+        "3%-5%": {
+          "bets": 0,
+          "voided": 0,
+          "predicted_ev": null
+        },
+        "5%-8%": {
+          "bets": 0,
+          "voided": 0,
+          "predicted_ev": null
+        },
+        "8%-": {
+          "bets": 0,
+          "voided": 0,
+          "predicted_ev": null
+        }
+      }
+    },
+    "season_splits": {
+      "by_market": {
+        "ast": {
+          "bets": 0,
+          "voided": 4
+        },
+        "fg3m": {
+          "bets": 0,
+          "voided": 1
+        },
+        "pra": {
+          "bets": 0,
+          "voided": 1
+        },
+        "pts": {
+          "bets": 0,
+          "voided": 1
+        }
+      },
+      "by_flag_time": {
+        "3 PM": {
+          "bets": 0,
+          "voided": 6
+        },
+        "6 PM": {
+          "bets": 0,
+          "voided": 1
+        }
+      },
+      "by_side": {
+        "over": {
+          "bets": 0,
+          "voided": 2
+        },
+        "under": {
+          "bets": 0,
+          "voided": 5
+        }
+      },
+      "by_tier": {
+        "high_conf": {
+          "bets": 0,
+          "voided": 3
+        },
+        "standard": {
+          "bets": 0,
+          "voided": 4
+        }
+      },
+      "by_source": {
+        "consensus": {
+          "bets": 0,
+          "voided": 6
+        },
+        "model-only": {
+          "bets": 0,
+          "voided": 1
+        }
+      },
+      "ev_vs_clv": {
+        "3%-5%": {
+          "bets": 0,
+          "voided": 0,
+          "predicted_ev": null
+        },
+        "5%-8%": {
+          "bets": 0,
+          "voided": 0,
+          "predicted_ev": null
+        },
+        "8%-": {
+          "bets": 0,
+          "voided": 0,
+          "predicted_ev": null
+        }
+      }
+    },
+    "parlays": {
+      "satellite": {
+        "parlays": 2,
+        "hit_rate": null,
+        "avg_ev": 0.1552,
+        "roi": 0.0
+      }
+    },
+    "slippage": {
+      "bets": 3,
+      "avg_implied_prob_cost": 0.0,
+      "worse_than_flagged": 0
+    },
+    "market_rule": []
+  },
+  "golive": {
+    "date": "2026-10-25",
+    "ready": false,
+    "criteria": [
+      {
+        "name": "300+ paper picks over 4+ weeks",
+        "ok": false,
+        "value": "0 picks over 0.0 weeks",
+        "detail": ""
+      },
+      {
+        "name": "CLV positive, and in 3 of 4 weeks",
+        "ok": false,
+        "value": "no CLV yet",
+        "detail": "weeks: n/a, n/a, n/a, n/a"
+      },
+      {
+        "name": "Calibration within 3 points, no bucket off by 8+",
+        "ok": false,
+        "value": "no picks yet",
+        "detail": ""
+      },
+      {
+        "name": "Pipeline clean 14 straight days",
+        "ok": false,
+        "value": "3 clean days in a row",
+        "detail": ""
+      },
+      {
+        "name": "Bankroll recorded and fixed",
+        "ok": "True",
+        "value": "1,000.00 set 2026-10-21",
+        "detail": ""
+      }
+    ]
+  }
+}

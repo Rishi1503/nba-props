@@ -14,6 +14,7 @@ recalibrate    monthly: fit the live calibration layer on recent results
 place          record a real bet: place PICK_ID --price -110 --stake 20
 market         switch a market off or back on: market pts --off "reason" / market pts --on
 bankroll       record the bankroll as of today (New York date): bankroll 1000 [--note "..."]
+unvoid-missing-stats  reopen picks voided only because their game's stats weren't loaded yet
 note-fix       record a manual fix (resets the go-live pipeline streak): note-fix "what"
 """
 
@@ -54,6 +55,7 @@ def main(argv: list[str] | None = None) -> None:
     pl.add_argument("pick_id", type=int)
     pl.add_argument("--price", type=int, required=True)
     pl.add_argument("--stake", type=float, required=True)
+    sub.add_parser("unvoid-missing-stats")
     bk = sub.add_parser("bankroll")
     bk.add_argument("amount", type=float)
     bk.add_argument("--note", default="bankroll")
@@ -137,6 +139,7 @@ def main(argv: list[str] | None = None) -> None:
         "market",
         "note-fix",
         "bankroll",
+        "unvoid-missing-stats",
     ):
         stage9(args, now, today, cfg, notifier)
 
@@ -181,6 +184,11 @@ def stage9(args, now, today, cfg, notifier) -> None:
         elif args.cmd == "place":
             real = place(s, args.pick_id, args.price, args.stake, now)
             print(f"recorded real bet {real.pick_id}: {args.stake:.2f} at {args.price:+d}")
+        elif args.cmd == "unvoid-missing-stats":
+            from nbaprops.ops.settle import unvoid_missing_stats
+
+            n, p = unvoid_missing_stats(s)
+            print(f"reopened {n} picks and {p} parlays voided only for missing stats")
         elif args.cmd == "bankroll":
             from decimal import Decimal
             from zoneinfo import ZoneInfo

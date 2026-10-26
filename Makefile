@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-tails backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout holdout-rerun bankroll review golive tune recalibrate api web demo e2e
+.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-tails backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout holdout-rerun unvoid bankroll review golive tune recalibrate api web demo e2e
 
 setup:
 	uv sync --all-extras --locked
@@ -101,6 +101,10 @@ status:
 
 # Store the production bundle from `make backtest-holdout` as the champion: BUNDLE=artifacts/models/prod-...
 # Record the bankroll as of today's New York date: make bankroll AMOUNT=1000
+# Reopen picks voided only because their game's stats weren't loaded yet (then stats-day, settle)
+unvoid:
+	uv run python -m nbaprops.ops.run unvoid-missing-stats
+
 bankroll:
 	uv run python -m nbaprops.ops.run bankroll $(AMOUNT)
 

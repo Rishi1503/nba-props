@@ -257,3 +257,63 @@ def test_squashed_report_names_match_their_players(stats_db):  # noqa: F811
         )
         assert resolve("Simzor,Bennick") == 9006  # the roster refresh gave him his alias
         assert resolve("Dybanz,Ajax") == 9007  # a rookie, matchable before his first game
+
+
+@pytest.mark.db
+def test_stats_day_catches_up_missed_days(stats_db):  # noqa: F811
+    """A morning without `stats-day` (or a blocked one) used to leave that day's games with no
+    stats for good: the next run loads from the earliest day still missing."""
+    from datetime import date
+
+    from nbaprops.db.models import PlayerGameLog
+
+    def game(gid, d):
+        return Game(
+            game_id=gid,
+            season="2025-26",
+            season_type="regular",
+            game_date=d,
+            tip_time=None,
+            home_team_id=1610612738,
+            away_team_id=1610612752,
+            status="scheduled",
+        )
+
+    day = date(2026, 1, 10)
+    with session_scope() as s:
+        s.add_all(
+            [
+                game("x1", date(2026, 1, 7)),
+                game("x2", date(2026, 1, 8)),
+                game("x3", date(2026, 1, 9)),
+            ]
+        )
+        s.flush()
+        s.add(
+            PlayerGameLog(
+                game_id="x2",
+                player_id=1628369,
+                team_id=1610612738,
+                minutes=30,
+                pts=20,
+                reb=5,
+                ast=5,
+                fg3m=2,
+            )
+        )
+    assert stats.catch_up_start("2025-26", day) == date(2026, 1, 7)  # x1 and x3 have no stats
+    with session_scope() as s:
+        for gid in ("x1", "x3"):
+            s.add(
+                PlayerGameLog(
+                    game_id=gid,
+                    player_id=1628369,
+                    team_id=1610612738,
+                    minutes=30,
+                    pts=20,
+                    reb=5,
+                    ast=5,
+                    fg3m=2,
+                )
+            )
+    assert stats.catch_up_start("2025-26", day) == day  # nothing missing: just yesterday

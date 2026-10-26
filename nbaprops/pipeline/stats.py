@@ -669,13 +669,35 @@ def backfill_season(fetch: Fetch, season: str, boxscores: bool = True) -> list[s
 RETRY_DAYS = 30  # the daily job also retries box scores still missing from this many days back
 
 
+def catch_up_start(season: str, day: date) -> date:
+    """The earliest date in the last RETRY_DAYS with a game but no player logs: a morning
+    without `stats-day` (or a blocked one) is filled in by the next run, instead of leaving
+    those games without stats (and their picks unsettled) for good."""
+    with session_scope() as s:
+        first = s.scalar(
+            select(func.min(Game.game_date)).where(
+                Game.season == season,
+                Game.game_date >= day - timedelta(days=RETRY_DAYS),
+                Game.game_date <= day,
+                Game.season_type != "cup_final",
+                ~select(PlayerGameLog.game_id)
+                .where(PlayerGameLog.game_id == Game.game_id)
+                .exists(),
+            )
+        )
+    return min(first, day) if first else day
+
+
 def pull_day(fetch: Fetch, day: date) -> list[str]:
     """Daily job: yesterday's games (all season types), their box scores, any box scores still
     missing from the last RETRY_DAYS, and today's rosters (positions and current teams)."""
     season = season_for_date(day)
+    start = catch_up_start(season, day)
+    if start < day:
+        log.info("catching up game logs from %s (days missed since)", start)
     ids, issues = [], []
-    for name in SEASON_TYPES:
-        got, problems = load_period(fetch, season, name, day, day)
+    for name in SEASON_TYPES:  # one request per season type covers the whole range
+        got, problems = load_period(fetch, season, name, start, day)
         ids += got
         issues += problems
     with session_scope() as s:
