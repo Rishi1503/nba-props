@@ -265,7 +265,7 @@ def test_stats_day_catches_up_missed_days(stats_db):  # noqa: F811
     stats for good: the next run loads from the earliest day still missing."""
     from datetime import date
 
-    from nbaprops.db.models import PlayerGameLog
+    from nbaprops.db.models import PlayerGameLog, TeamGameLog
 
     def game(gid, d):
         return Game(
@@ -289,31 +289,20 @@ def test_stats_day_catches_up_missed_days(stats_db):  # noqa: F811
             ]
         )
         s.flush()
+        s.add(TeamGameLog(game_id="x2", team_id=1610612738))  # x2: game logs loaded
+        # x1: only a box score's did-not-play row, still missing its game logs
         s.add(
             PlayerGameLog(
-                game_id="x2",
+                game_id="x1",
                 player_id=1628369,
                 team_id=1610612738,
-                minutes=30,
-                pts=20,
-                reb=5,
-                ast=5,
-                fg3m=2,
+                minutes=0,
+                dnp=True,
+                dnp_reason="DND - Injury/Illness",
             )
         )
     assert stats.catch_up_start("2025-26", day) == date(2026, 1, 7)  # x1 and x3 have no stats
     with session_scope() as s:
         for gid in ("x1", "x3"):
-            s.add(
-                PlayerGameLog(
-                    game_id=gid,
-                    player_id=1628369,
-                    team_id=1610612738,
-                    minutes=30,
-                    pts=20,
-                    reb=5,
-                    ast=5,
-                    fg3m=2,
-                )
-            )
+            s.add(TeamGameLog(game_id=gid, team_id=1610612738))
     assert stats.catch_up_start("2025-26", day) == day  # nothing missing: just yesterday

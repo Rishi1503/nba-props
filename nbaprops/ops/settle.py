@@ -1,7 +1,8 @@
 """Morning settlement (plan, Stage 8 8:00 AM job; Stage 9 CLV definition).
 
-Grades every unsettled pick whose game is final and whose box scores are loaded (a game with
-no box scores yet waits; a player with no line in a loaded box score didn't play: void).
+Grades every unsettled pick whose game is final and whose game logs are loaded (the team game
+logs: a box score alone only adds rows for players who did NOT play, so it doesn't count; a game
+without game logs waits; a player with no line in loaded game logs didn't play: void).
 Idempotent: settled picks are never touched again, so it can run on every cycle.
 
   pick:   result (win/loss/push/void), P&L at the price taken (price_placed for real bets,
@@ -52,7 +53,7 @@ def _ready_picks(session) -> pd.DataFrame:
         text("""
         SELECT p.*, g.tip_time, g.game_date FROM picks p JOIN games g USING (game_id)
         WHERE p.result IS NULL AND g.status = 'final'
-          AND EXISTS (SELECT 1 FROM player_game_logs l WHERE l.game_id = p.game_id)"""),
+          AND EXISTS (SELECT 1 FROM team_game_logs t WHERE t.game_id = p.game_id)"""),
         session.connection(),
     )
 
@@ -148,8 +149,8 @@ def void_unplayed(session, now: datetime, res: "SettleResult") -> None:
             text("""
         SELECT p.pick_id FROM picks p JOIN games g USING (game_id)
         WHERE p.result IS NULL AND g.status <> 'final' AND g.tip_time < :cut
-          AND NOT EXISTS (SELECT 1 FROM player_game_logs l WHERE l.game_id = g.game_id)
-          AND EXISTS (SELECT 1 FROM player_game_logs l2 JOIN games g2 ON g2.game_id = l2.game_id
+          AND NOT EXISTS (SELECT 1 FROM team_game_logs t WHERE t.game_id = g.game_id)
+          AND EXISTS (SELECT 1 FROM team_game_logs t2 JOIN games g2 ON g2.game_id = t2.game_id
                       WHERE g2.game_date > g.game_date + 1)"""),
             {"cut": now - POSTPONED_AFTER},
         )
@@ -165,16 +166,19 @@ def void_unplayed(session, now: datetime, res: "SettleResult") -> None:
 
 
 def unvoid_missing_stats(session) -> tuple[int, int]:
-    """Reopen picks voided only because their game's stats weren't loaded yet (the old
-    36-hour rule), and the parlays they're in. A real did-not-play void needs the game's
-    stats, so it is never touched; a real postponement gets voided again by the current
-    rule once later games' stats are in."""
+    """Reopen picks voided only because their game's stats weren't loaded yet, and the
+    parlays they're in: games without game logs, or a player who in fact played. A real
+    did-not-play void (game logs loaded, he has no minutes) is never touched; a real
+    postponement gets voided again by the current rule once later games' stats are in."""
     ids = list(
         session.execute(
             text("""
         SELECT p.pick_id FROM picks p
-        WHERE p.result = 'void'
-          AND NOT EXISTS (SELECT 1 FROM player_game_logs l WHERE l.game_id = p.game_id)""")
+        WHERE p.result = 'void' AND (
+          NOT EXISTS (SELECT 1 FROM team_game_logs t WHERE t.game_id = p.game_id)
+          OR EXISTS (SELECT 1 FROM player_game_logs l
+                     WHERE l.game_id = p.game_id AND l.player_id = p.player_id
+                       AND COALESCE(l.minutes, 0) > 0 AND NOT COALESCE(l.dnp, false)))""")
         )
         .scalars()
         .all()

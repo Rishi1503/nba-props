@@ -8,7 +8,15 @@ import pytest
 from sqlalchemy import select, text
 
 from nbaprops.db.base import session_scope
-from nbaprops.db.models import BankrollEntry, ModelRun, Parlay, ParlayLeg, Pick, PlayerGameLog
+from nbaprops.db.models import (
+    BankrollEntry,
+    ModelRun,
+    Parlay,
+    ParlayLeg,
+    Pick,
+    PlayerGameLog,
+    TeamGameLog,
+)
 from nbaprops.ops import alerts, bundles
 from nbaprops.ops.settle import settle
 from tests.test_slate import BROWN, CADE, DAY, G1, G3, NOW, WEMBY, seed
@@ -41,6 +49,13 @@ def settle_setup():
     seed()
     with session_scope() as s:
         s.execute(text(f"UPDATE games SET status = 'final' WHERE game_id = '{G1}'"))
+        # G1's game logs are loaded (team rows come only with them, never from a box score)
+        s.add_all(
+            [
+                TeamGameLog(game_id=G1, team_id=1610612765),
+                TeamGameLog(game_id=G1, team_id=1610612738),
+            ]
+        )
         s.add_all(
             [
                 PlayerGameLog(
@@ -329,6 +344,7 @@ def _a_later_game_with_stats(days_after: int = 2) -> None:
                 fg3m=2,
             )
         )
+        s.add(TeamGameLog(game_id="0022600099", team_id=1610612765))
 
 
 def test_picks_on_a_game_that_never_finished_are_voided():
@@ -389,3 +405,45 @@ def test_voids_made_only_for_missing_stats_are_reopened():
         assert s.get(Parlay, par_id).result is None
         voids = s.scalars(select(Pick.result).where(Pick.result == "void")).all()
         assert voids == ["void"]  # Duren's real void stays
+
+
+def test_a_box_score_alone_does_not_count_as_stats_loaded():
+    """Oct 22, 2026: the box score (which only adds players who did NOT play) loaded before the
+    game logs, so settlement saw "stats loaded", found no line for the players picked, and
+    voided every one. Now picks wait for the game logs, then grade normally."""
+    from tests.test_slate import TIP1
+
+    settle_setup()
+    with session_scope() as s:
+        s.execute(text(f"UPDATE games SET status = 'final' WHERE game_id = '{G3}'"))
+        s.add(
+            PlayerGameLog(
+                game_id=G3,
+                player_id=CADE,
+                team_id=1610612765,
+                minutes=0,
+                dnp=True,
+                dnp_reason="DNP - Coach's Decision",
+            )
+        )  # a box-score row
+    with session_scope() as s:
+        settle(s, NEXT_DAY, TIP1 + timedelta(hours=20))
+        assert s.scalars(select(Pick).where(Pick.player_id == WEMBY)).one().result is None
+    with session_scope() as s:  # the game logs arrive: he played
+        s.add(TeamGameLog(game_id=G3, team_id=1610612759))
+        s.add(
+            PlayerGameLog(
+                game_id=G3,
+                player_id=WEMBY,
+                team_id=1610612759,
+                minutes=33,
+                pts=27,
+                reb=12,
+                ast=3,
+                fg3m=2,
+            )
+        )
+    with session_scope() as s:
+        settle(s, NEXT_DAY, TIP1 + timedelta(hours=26))
+        result = s.scalars(select(Pick).where(Pick.player_id == WEMBY)).one().result
+    assert result in ("win", "loss", "push")  # graded, not void

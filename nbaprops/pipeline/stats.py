@@ -680,9 +680,9 @@ def catch_up_start(season: str, day: date) -> date:
                 Game.game_date >= day - timedelta(days=RETRY_DAYS),
                 Game.game_date <= day,
                 Game.season_type != "cup_final",
-                ~select(PlayerGameLog.game_id)
-                .where(PlayerGameLog.game_id == Game.game_id)
-                .exists(),
+                # game logs, not box scores: a box score alone only adds the players who
+                # did NOT play, and that wrongly passed as "loaded" (Oct 22 picks voided)
+                ~select(TeamGameLog.game_id).where(TeamGameLog.game_id == Game.game_id).exists(),
             )
         )
     return min(first, day) if first else day
