@@ -262,3 +262,66 @@ def test_health_flags_a_game_stuck_after_tip():
     msgs = dict(health_at(TIP1 + timedelta(hours=7)))
     assert f"stuck:{G1}" in msgs and "postponed" in msgs[f"stuck:{G1}"]
     assert f"stuck:{G1}" not in dict(health_at(TIP1 + timedelta(hours=2)))
+
+
+@pytest.mark.db
+def test_pricing_is_due_until_a_cycle_has_priced_since_the_last_pricing_time():
+    """GitHub starts scheduled jobs late (often 15-60 minutes at the top of the hour). The old
+    "first 15 minutes of 10, 15, 18 o'clock" window skipped Oct 23-25, 2026 entirely."""
+    from zoneinfo import ZoneInfo
+
+    from sqlalchemy import delete
+
+    from nbaprops.db.models import OpsRun
+
+    ny = ZoneInfo("America/New_York")
+
+    def at(h, m):
+        return datetime(2026, 10, 23, h, m, tzinfo=ny)
+
+    seed()
+    with session_scope() as s:
+        s.execute(delete(OpsRun))
+    with session_scope() as s:
+        assert not cycle.pricing_due_in(s, at(9, 30))  # no pricing time yet today
+        assert cycle.pricing_due_in(s, at(10, 40))  # the cron ran 40 minutes late
+        s.add(
+            OpsRun(
+                kind="cycle",
+                started_ts=at(10, 41),
+                finished_ts=at(10, 44),
+                ok=True,
+                actions=["odds", "settle", "project", "price", "health"],
+            )
+        )
+    with session_scope() as s:
+        assert not cycle.pricing_due_in(s, at(10, 55))  # priced since 10:00
+        assert cycle.pricing_due_in(s, at(15, 20))  # the 3 PM run is due
+        s.add(
+            OpsRun(
+                kind="cycle",
+                started_ts=at(15, 21),
+                finished_ts=at(15, 22),
+                ok=False,
+                actions=["odds", "settle", "project", "health"],
+            )
+        )  # pricing failed
+    with session_scope() as s:
+        assert cycle.pricing_due_in(s, at(15, 35))  # so it's still due: try again
+
+
+@pytest.mark.db
+def test_a_late_cycle_still_prices_and_an_early_one_never_prices_twice():
+    seed()
+    fake, rec = Fake(), alerts.RecordingNotifier()
+    late = PRICING + timedelta(minutes=40)  # outside the old window
+    deps = fake.deps()
+    deps.pricing_due = lambda now: True
+    deps.full_snapshot = lambda now: fake.calls.append(("snapshot", None))
+    cycle.run_cycle(session_scope, late, deps, rec)
+    assert names(fake) == ["odds", "snapshot", "settle", "project", "price", "health"]
+    fake.calls.clear()
+    deps = fake.deps()
+    deps.pricing_due = lambda now: False  # already priced since 10:00
+    cycle.run_cycle(session_scope, PRICING, deps, rec)  # 10:00 exactly: the old window
+    assert "price" not in names(fake) and "project" not in names(fake)

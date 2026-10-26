@@ -20,7 +20,7 @@ import logging
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -48,6 +48,10 @@ class Deps:
     pulled_games: Callable  # (session, now) -> {game_id: [player names]} pulled this cycle
     health: Callable  # (session, today, now) -> list[(key, message)]
     ramp: Callable | None = None  # (session) -> (real stake multiplier, note)
+    # (now) -> bool: a pricing time has passed today with no pricing run since. Without it,
+    # only a cycle starting in the first minutes of a pricing hour prices (is_pricing_run).
+    pricing_due: Callable | None = None
+    full_snapshot: Callable | None = None  # (now) -> None: every game's odds, before pricing
 
 
 @dataclass
@@ -60,6 +64,24 @@ class CycleReport:
 def is_pricing_run(now: datetime) -> bool:
     local = now.astimezone(ET)
     return local.hour in PRICING_HOURS_ET and local.minute < TICK_MINUTES
+
+
+def pricing_due_in(session, now: datetime) -> bool:
+    """A pricing time (10 AM, 3 PM, 6 PM New York) has passed today and no cycle has priced
+    since. GitHub starts scheduled jobs late, often 15-60 minutes at the top of the hour: a
+    fixed "first 15 minutes" window skipped whole days of picks (Oct 23-25, 2026). A failed
+    pricing step isn't recorded as done, so the next cycle tries again."""
+    local = now.astimezone(ET)
+    slots = [datetime.combine(local.date(), time(h), ET) for h in PRICING_HOURS_ET]
+    passed = [t for t in slots if t <= local]
+    if not passed:
+        return False
+    done = session.execute(
+        text("""SELECT 1 FROM ops_runs WHERE kind = 'cycle' AND started_ts >= :since
+                AND actions @> '["price"]'::jsonb LIMIT 1"""),
+        {"since": passed[-1]},
+    ).first()
+    return done is None
 
 
 def run_cycle(session_factory, now: datetime, deps: Deps, notifier: alerts.Notifier) -> CycleReport:
@@ -81,7 +103,10 @@ def run_cycle(session_factory, now: datetime, deps: Deps, notifier: alerts.Notif
             )
             return None
 
-    step("odds", lambda: deps.tick(now))
+    due = deps.pricing_due(now) if deps.pricing_due else is_pricing_run(now)
+    plan = step("odds", lambda: deps.tick(now))
+    if due and deps.full_snapshot and not getattr(plan, "full_snapshot", False):
+        step("snapshot", lambda: deps.full_snapshot(now))  # fresh odds for a late pricing run
 
     def _settle():
         with session_factory() as s:
@@ -104,7 +129,7 @@ def run_cycle(session_factory, now: datetime, deps: Deps, notifier: alerts.Notif
             notifier.send(format_picks(new, label, factor, note))
         return res
 
-    if is_pricing_run(now):
+    if due:
         step("project", lambda: _with(session_factory, lambda s: deps.project(s, today, now, None)))
         step("price", lambda: _price_and_alert(f"{now.astimezone(ET):%-I:%M %p} picks"))
     else:
@@ -330,9 +355,10 @@ def health(
 
 
 def real_deps(provider, cfg) -> Deps:
+    from nbaprops.db.base import session_scope
     from nbaprops.ops import bundles
     from nbaprops.ops.settle import settle
-    from nbaprops.pipeline.run import tick
+    from nbaprops.pipeline.run import odds_snapshot, tick
     from nbaprops.pricing import slate
 
     def project(session, today, now, game_ids):
@@ -359,6 +385,8 @@ def real_deps(provider, cfg) -> Deps:
 
     return Deps(
         tick=lambda now: tick(provider, now),
+        full_snapshot=lambda now: odds_snapshot(provider, now),
+        pricing_due=lambda now: _with(session_scope, lambda s: pricing_due_in(s, now)),
         settle=settle,
         project=project,
         price=lambda s, today, now: slate.price_slate(s, today, now, cfg),
