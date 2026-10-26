@@ -562,3 +562,38 @@ def test_command_line_tail_calibration(frame, tmp_path):
     assert rep["settings"]["without"] == "roster"
     md = (tmp_path / "reports" / "backtest" / f"{rep['run_id']}.md").read_text()
     assert "Tail calibration" in md
+
+
+def test_calibration_lines_span_each_simulated_distribution():
+    """Lines at the 10th-90th percentiles of each player's draws: raw P(over) from ~0.9 down
+    to ~0.1, with the results, so calibrators learn the tails too."""
+    import numpy as np
+
+    rng = np.random.default_rng(3)
+    sims = {
+        m: rng.poisson(lam, (2, 4000)).astype(float)
+        for m, lam in (("pts", 22), ("reb", 7), ("ast", 5), ("fg3m", 2), ("pra", 34))
+    }
+    f = pd.DataFrame(
+        {
+            "game_date": pd.to_datetime(["2025-11-01"] * 2),
+            **{f"y_{m}": [float(v[0, 0]), np.nan] for m, v in sims.items()},
+        }
+    )
+    key = pd.Series(["g:1", "g:2"])
+    out = wf.calibration_lines(f, {"g": (np.array([0, 1]), sims)}, key)
+    pts = out[out["market"] == "pts"].sort_values("line")
+    assert set(out["row_key"]) == {"g:1"}  # a row without a result is skipped
+    assert pts["p_raw"].max() > 0.85 and pts["p_raw"].min() < 0.15
+    y = f.loc[0, "y_pts"]
+    assert (pts["hit"] == (y > pts["line"]).astype(float)).all()
+
+
+def test_the_walk_forward_calibrates_on_the_tails(frame):
+    """The calibrator learns from lines across each distribution, not only near the middle."""
+    res = wf.run_season(frame, "2025-26", wf.Settings(**FAST))
+    cal, test = res.cal_lines, res.lines
+    for m in ("pts", "reb"):
+        c, t = cal[cal["market"] == m]["p_raw"], test[test["market"] == m]["p_raw"]
+        assert c.quantile(0.05) < t.quantile(0.05) and c.quantile(0.95) > t.quantile(0.95)
+        assert c.min() < 0.2 and c.max() > 0.8

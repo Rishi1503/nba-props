@@ -71,6 +71,9 @@ class Result:
     priced: pd.DataFrame = field(default_factory=pd.DataFrame)
     # calibrated half-point grids {"24.5": p, ...}, stored exactly as live projections are
     grids: pd.DataFrame = field(default_factory=pd.DataFrame)
+    # what calibrators are fit on: lines across each simulated distribution (see
+    # calibration_lines), not only the test lines near each player's typical output
+    cal_lines: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 # --- blocks --------------------------------------------------------------------
@@ -242,6 +245,46 @@ def grids_at(
     return pd.DataFrame(out)
 
 
+CAL_QUANTILES = (0.10, 0.25, 0.40, 0.60, 0.75, 0.90)
+
+
+def calibration_lines(f: pd.DataFrame, draws: dict, key: pd.Series) -> pd.DataFrame:
+    """Lines at the 10th-90th percentiles of each player's simulated outcomes, with the raw
+    P(over) and the result: raw probabilities from about 0.1 to 0.9. The test lines sit near
+    each player's typical output (raw P of 0.35-0.65 for points), so a calibrator fit only on
+    them knew nothing about the tails, where staked picks and alt-line rungs live (the
+    2024-25 tail check: points and PRA overs at 60-85% won 4-10 points more than predicted)."""
+    parts, k = [], len(CAL_QUANTILES)
+    keys, dates = key.to_numpy(), f["game_date"].to_numpy()
+    for idx, sims in draws.values():
+        idx = np.asarray(idx)
+        for m in MARKETS:
+            s = np.asarray(sims[m], float)
+            y = f[f"y_{m}"].to_numpy(float)[idx]
+            ok = np.isfinite(y)
+            if not ok.any():
+                continue
+            s, y, rows = s[ok], y[ok], idx[ok]
+            lines = np.floor(np.quantile(s, CAL_QUANTILES, axis=1)).T + 0.5  # (rows, k)
+            p = (s[:, None, :] > lines[:, :, None]).mean(axis=2)
+            parts.append(
+                pd.DataFrame(
+                    {
+                        "market": m,
+                        "row_key": np.repeat(keys[rows], k),
+                        "game_date": np.repeat(dates[rows], k),
+                        "line": lines.ravel(),
+                        "p_raw": p.ravel(),
+                        "hit": (y[:, None] > lines).astype(float).ravel(),
+                    }
+                )
+            )
+    if not parts:
+        return pd.DataFrame(columns=["market", "row_key", "game_date", "line", "p_raw", "hit"])
+    out = pd.concat(parts, ignore_index=True)
+    return out.drop_duplicates(["row_key", "market", "line"]).reset_index(drop=True)
+
+
 def run_block(
     frame: pd.DataFrame,
     models: tuple,
@@ -254,7 +297,7 @@ def run_block(
     """Simulate one block day by day (bounded memory); returns (lines, rows, minutes,
     priced lines)."""
     minutes_model, rate_model, scenario = models
-    out_lines, out_rows, out_min, out_priced, out_grids = [], [], [], [], []
+    out_lines, out_rows, out_min, out_priced, out_grids, out_cal = [], [], [], [], [], []
     for day, day_frame in frame.groupby("game_date", sort=True):
         f = day_frame.reset_index(drop=True)
         run_id = f"{settings.label}:{block_label}"
@@ -286,6 +329,7 @@ def run_block(
                 np.nan,
             )
         out_lines.append(tl)
+        out_cal.append(calibration_lines(f, draws, key))
         if settings.price_lines is not None and len(settings.price_lines):
             out_priced.append(price_at_lines(settings.price_lines, f, draws, msum, calibrator))
         if settings.grid_keys is not None and len(settings.grid_keys):
@@ -347,6 +391,7 @@ def run_block(
         pd.concat(out_min, ignore_index=True),
         priced,
         grids,
+        pd.concat(out_cal, ignore_index=True),
     )
 
 
@@ -357,13 +402,13 @@ def run_season(
     df: pd.DataFrame, season: str, settings: Settings, seed_lines: pd.DataFrame | None = None
 ) -> Result:
     """Walk-forward over `season`. `df` is the full training frame (every season loaded);
-    `seed_lines` are earlier out-of-sample lines that start the calibrator."""
+    `seed_lines` are earlier out-of-sample calibration lines that start the calibrator."""
     features = list(settings.features or FEATURE_COLUMNS)
     df = df[(df["season_type"] != "preseason") & df["y_minutes"].notna()]
     target = df[df["season"] == season]
     eligible = df[df["season"] >= settings.first_train_season]
     prior = seed_lines.copy() if seed_lines is not None else pd.DataFrame()
-    lines, rows, mins, priced, grid_parts, info = [], [], [], [], [], []
+    lines, rows, mins, priced, grid_parts, cal_parts, info = [], [], [], [], [], [], []
     for start, end in blocks(target["game_date"], settings.retrain_days):
         train = eligible[eligible["game_date"] < start]
         frame = target[(target["game_date"] >= start) & (target["game_date"] < end)]
@@ -374,14 +419,15 @@ def run_season(
         cal = _calibrator(prior)
         k = {m: baseline_scale(train.dropna(subset=[f"y_{m}"]), m) for m in MARKETS}
         label = f"{start:%Y-%m-%d}"
-        bl, br, bm, bp, bg = run_block(frame, models[:3], cal, k, history, settings, label)
+        bl, br, bm, bp, bg, bc = run_block(frame, models[:3], cal, k, history, settings, label)
         priced.append(bp)
         grid_parts.append(bg)
         bl["block"] = label
         lines.append(bl)
         rows.append(br)
         mins.append(bm)
-        prior = pd.concat([prior, bl], ignore_index=True)
+        cal_parts.append(bc)
+        prior = pd.concat([prior, bc], ignore_index=True)  # later blocks calibrate on these
         info.append(
             {
                 "block": label,
@@ -405,6 +451,7 @@ def run_season(
         info,
         pd.concat(priced, ignore_index=True) if priced else pd.DataFrame(),
         pd.concat(grid_parts, ignore_index=True) if grid_parts else pd.DataFrame(),
+        pd.concat(cal_parts, ignore_index=True),
     )
 
 
@@ -417,5 +464,5 @@ def run(
     before = prev_season(season)
     if warmup and before > settings.first_train_season and (df["season"] == before).any():
         warm = run_season(df, before, settings)
-    seed = warm.lines if warm is not None else None
+    seed = warm.cal_lines if warm is not None else None
     return run_season(df, season, settings, seed), warm
