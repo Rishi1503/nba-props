@@ -228,7 +228,7 @@ def production_from_holdout(args) -> dict:
         features=model_inputs(s.get("without")),  # the inputs that run evaluated
     )
     target, warm = wf.run(df, HOLDOUT_SEASON, settings)
-    oos = pd.concat([x.cal_lines for x in (warm, target) if x is not None], ignore_index=True)
+    oos = pd.concat([x.lines for x in (warm, target) if x is not None], ignore_index=True)
     folder = save_production(
         df,
         oos,
@@ -520,7 +520,7 @@ def main(argv: list[str] | None = None) -> dict:
                 "above was still written."
             )
         verdict = {m: bool(v["passes"]) for m, v in report["layer_a"]["targets"]["markets"].items()}
-        oos = pd.concat([x.cal_lines for x in (warm, target) if x is not None], ignore_index=True)
+        oos = pd.concat([x.lines for x in (warm, target) if x is not None], ignore_index=True)
         save_production(
             df,
             oos,

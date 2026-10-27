@@ -71,10 +71,7 @@ def fake_training(monkeypatch, seen):
 
     def walk(df, season, settings):
         seen["settings"] = settings
-        return (
-            SimpleNamespace(lines=lines, cal_lines=lines),
-            SimpleNamespace(lines=lines, cal_lines=lines),
-        )
+        return SimpleNamespace(lines=lines), SimpleNamespace(lines=lines)
 
     monkeypatch.setattr(run.wf, "run", walk)
 
