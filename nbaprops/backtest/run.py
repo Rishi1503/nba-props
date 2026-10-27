@@ -123,6 +123,7 @@ def production_bundle(
     run_id: str,
     first_train_season: str,
     features: list[str] | None = None,
+    oos_cal: pd.DataFrame | None = None,
 ) -> Bundle:
     """Every model on every training season through the latest game; the calibrator on the
     walk-forward's out-of-sample predictions (the only honest calibration data once the
@@ -141,6 +142,13 @@ def production_bundle(
         {m: g["p_raw"].to_numpy() for m, g in ol.groupby("market")},
         {m: g["hit"].to_numpy() for m, g in ol.groupby("market")},
     )
+    if oos_cal is not None and len(oos_cal):  # the tails from lines across each distribution
+        oc = oos_cal.sort_values(["game_date", "row_key"], kind="stable")
+        tail = calibrate.Calibrator.fit(
+            {m: g["p_raw"].to_numpy() for m, g in oc.groupby("market")},
+            {m: g["hit"].to_numpy() for m, g in oc.groupby("market")},
+        )
+        cal = calibrate.Calibrator.hybrid(cal, tail)
     meta = {
         "trained_through": minutes_model.trained_through,
         "train_seasons": sorted(train["season"].unique().tolist()),
@@ -189,6 +197,7 @@ def save_production(
     models_dir: Path = Path("artifacts/models"),
     accepted_rerun: str | None = None,
     features: list[str] | None = None,
+    oos_cal=None,
 ) -> Path:
     """The production bundle, recording which markets passed the holdout. Markets that failed
     are switched off when it is imported as champion; none passing means no bundle."""
@@ -197,7 +206,12 @@ def save_production(
     if not passed:
         raise SystemExit("No market passed the holdout: no production model.")
     bundle = production_bundle(
-        df, oos, f"prod-{datetime.now(UTC):%Y%m%d%H%M}", first_train_season, features=features
+        df,
+        oos,
+        f"prod-{datetime.now(UTC):%Y%m%d%H%M}",
+        first_train_season,
+        features=features,
+        oos_cal=oos_cal,
     )
     bundle.meta["holdout"] = {
         "run_id": holdout_run,
@@ -228,7 +242,8 @@ def production_from_holdout(args) -> dict:
         features=model_inputs(s.get("without")),  # the inputs that run evaluated
     )
     target, warm = wf.run(df, HOLDOUT_SEASON, settings)
-    oos = pd.concat([x.cal_lines for x in (warm, target) if x is not None], ignore_index=True)
+    oos = pd.concat([x.lines for x in (warm, target) if x is not None], ignore_index=True)
+    oos_cal = pd.concat([x.cal_lines for x in (warm, target) if x is not None], ignore_index=True)
     folder = save_production(
         df,
         oos,
@@ -237,6 +252,7 @@ def production_from_holdout(args) -> dict:
         args.from_holdout,
         accepted_rerun=args.accept_rerun,
         features=model_inputs(s.get("without")),
+        oos_cal=oos_cal,
     )
     return {"bundle": str(folder), "verdict": verdict}
 
@@ -520,7 +536,10 @@ def main(argv: list[str] | None = None) -> dict:
                 "above was still written."
             )
         verdict = {m: bool(v["passes"]) for m, v in report["layer_a"]["targets"]["markets"].items()}
-        oos = pd.concat([x.cal_lines for x in (warm, target) if x is not None], ignore_index=True)
+        oos = pd.concat([x.lines for x in (warm, target) if x is not None], ignore_index=True)
+        oos_cal = pd.concat(
+            [x.cal_lines for x in (warm, target) if x is not None], ignore_index=True
+        )
         save_production(
             df,
             oos,
@@ -529,6 +548,7 @@ def main(argv: list[str] | None = None) -> dict:
             run_id,
             accepted_rerun=None if clean else args.accept_rerun,
             features=model_inputs(args.without),
+            oos_cal=oos_cal,
         )
     return report
 
