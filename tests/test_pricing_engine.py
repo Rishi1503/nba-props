@@ -161,6 +161,8 @@ def test_push_aware_ev_and_kelly_reduce_to_the_usual_formulas_without_a_push():
 # --- pricing engine ------------------------------------------------------------------------
 
 RULES = engine.Rules()
+# for tests of other rules whose examples carry edges above the sanity cap (tested on its own)
+NO_CAP = engine.Rules(max_edge=10.0)
 BOARD = rows(
     (0, "draftkings", A, 24.5, 100, -120),  # no-vig over = 0.5 / (0.5 + 0.54545) = 0.47826
     (0, "fanduel", A, 24.5, -110, -110),
@@ -190,7 +192,7 @@ def test_the_ev_floor():
 
 def test_model_only_shrinks_toward_draftkings_and_needs_five_percent():
     board = market.board(BOARD[BOARD["book"].isin(["draftkings", "fanduel"])], NOW)
-    c = engine.candidates(model(p_over=0.70), board, RULES).iloc[0]
+    c = engine.candidates(model(p_over=0.70), board, NO_CAP).iloc[0]
     dk = 0.5 / (0.5 + 120 / 220)
     fair = 0.70 + 0.5 * (dk - 0.70)
     assert not c["has_consensus"] and c["p_fair"] == pytest.approx(fair)
@@ -309,7 +311,9 @@ def test_milestone_with_consensus_uses_the_shifted_distribution():
     assert c["has_consensus"] and c["anchor_line"] == 24.5
     assert c["p_fair"] == pytest.approx(expect)
     assert c["ev"] == pytest.approx(expect * 1.5 - (1 - expect))  # +150 -> d = 2.5
-    assert c["flag"] == (c["ev"] >= RULES.ev_min) and c["side"] == "over"
+    # flagged only between the EV floor and the sanity cap (above it: held back)
+    assert c["flag"] == (RULES.ev_min <= c["ev"] <= RULES.max_edge) and c["side"] == "over"
+    assert c["held_back"] == (c["ev"] > RULES.max_edge)
     assert c["line_type"] == "milestone" and c["p_push"] == 0
 
 
@@ -318,7 +322,7 @@ def test_milestone_without_consensus_is_model_only_and_needs_five_percent():
     p = poisson_grid(22)["19.5"]
     fair = p + 0.5 * (1 / 2.5 - p)  # halfway toward DraftKings' implied probability
     assert not c["has_consensus"] and c["p_fair"] == pytest.approx(fair)
-    assert c["flag"] == (c["ev"] >= RULES.ev_min_model_only)
+    assert c["flag"] == (RULES.ev_min_model_only <= c["ev"] <= RULES.max_edge)
 
 
 def test_milestone_blocked_by_low_confidence_and_skipped_without_a_projection():
@@ -462,7 +466,7 @@ def test_milestone_scenarios_share_the_blends_shift():
     g = _grids().assign(
         scenarios=[{"player_id": 9, "p_play": 0.5, "in": poisson_grid(19), "out": poisson_grid(25)}]
     )
-    c = engine.milestone_candidates(g, _ms_board(), RULES).iloc[0]
+    c = engine.milestone_candidates(g, _ms_board(), NO_CAP).iloc[0]
     shift = engine.anchor_shift(poisson_grid(22), 24.5, 0.5)
     f_in = engine.shifted_tail(poisson_grid(19), 19.5, shift=shift)
     f_out = engine.shifted_tail(poisson_grid(25), 19.5, shift=shift)
@@ -576,3 +580,65 @@ def test_a_high_confidence_pick_keeps_the_players_slot_when_standard_flags_arent
     assert list(hc_only["line"]) == [4.5] and hc_only["stake"].iloc[0] > 0
     both = engine.select_and_size(c, 1000.0, replace(RULES, stake_standard_flags=True))
     assert list(both["line"]) == [8.5]  # staking everything: growth decides
+
+
+def test_the_sanity_cap_holds_back_implausible_edges():
+    """Oct 26, 2026: main-line edges of +18% to +37% (Jaylin Williams, Haliburton). An edge
+    that large usually means the model is missing news, not that DraftKings is wrong."""
+    from dataclasses import replace
+
+    # model 0.90: fair = 0.27 + 0.35 = 0.62 at +100: EV 0.24, above the 0.15 cap
+    c = engine.candidates(model(p_over=0.90), market.board(BOARD, NOW), RULES).iloc[0]
+    assert c["ev"] == pytest.approx(0.24)
+    assert c["held_back"] and not c["flag"] and not c["high_confidence"]
+    wide = engine.candidates(
+        model(p_over=0.90), market.board(BOARD, NOW), replace(RULES, max_edge=0.30)
+    ).iloc[0]
+    assert wide["flag"] and not wide["held_back"]
+
+
+def test_far_milestone_rungs_are_never_flagged():
+    """The far tail is priced from the model alone, and it overstated longshots ("45+ points"
+    and "25+ points" parlay legs at +118%). Only rungs inside the validated band count."""
+    from dataclasses import replace
+
+    no_cap = replace(RULES, max_edge=10.0)
+    far_board = market.board(
+        rows(
+            (0, "draftkings", A, 34.5, 900, None, "milestone"),
+            (0, "fanduel", A, 24.5, -110, -110),
+            (0, "bovada", A, 24.5, -110, -110),
+        ),
+        NOW,
+    )
+    far = engine.milestone_candidates(_grids(), far_board, no_cap).iloc[0]
+    assert far["p_model"] < RULES.milestone_p_min
+    assert not far["flag"] and not far["held_back"]  # out of band: never a pick, even uncapped
+    near = engine.milestone_candidates(_grids(), _ms_board(), no_cap).iloc[0]
+    assert RULES.milestone_p_min <= near["p_model"] <= RULES.milestone_p_max
+    assert near["flag"]  # inside the band, edge allowed by this cap: flagged
+    capped = engine.milestone_candidates(_grids(), _ms_board(), RULES).iloc[0]
+    assert capped["held_back"] and not capped["flag"]  # same rung, default cap: held back
+
+
+def test_the_cap_and_band_are_validated_in_the_config():
+    import yaml
+
+    from nbaprops.config import StrategyConfig
+
+    base = yaml.safe_load(open("config/strategy.yaml"))
+    StrategyConfig.model_validate(base)  # the shipped config is valid
+    with pytest.raises(ValueError, match="max_edge"):
+        StrategyConfig.model_validate({**base, "max_edge": base["ev_min_model_only"]})
+    with pytest.raises(ValueError, match="milestone_p_min"):
+        StrategyConfig.model_validate({**base, "milestone_p_min": 0.9, "milestone_p_max": 0.5})
+
+
+def test_the_board_says_how_many_props_were_held_back():
+    from datetime import date, datetime
+
+    from nbaprops.pricing import run as prun
+    from nbaprops.pricing.slate import SlateResult
+
+    res = SlateResult(date(2026, 10, 26), datetime(2026, 10, 26, 20, 0), "r", held_back=3)
+    assert "3 props held back" in prun.render(res)

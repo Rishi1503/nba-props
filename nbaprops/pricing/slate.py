@@ -50,6 +50,8 @@ class SlateResult:
     blocked_low_confidence: int = 0
     # props blocked only by the Questionable-teammate rule (questionable_teammates)
     blocked_questionable: int = 0
+    # props held back by the sanity cap (EV above max_edge: likely missing news), logged only
+    held_back: int = 0
 
 
 # --- loaders -------------------------------------------------------------------------
@@ -336,6 +338,8 @@ def price_slate(
                 & ~engine.questionable_ok(cands, rules)
             ).sum()
         )
+    if len(cands) and "held_back" in cands:
+        res.held_back = int(cands["held_back"].fillna(False).astype(bool).sum())
     if cands.empty:
         res.skipped.append("no DraftKings props matched the projections")
         return res

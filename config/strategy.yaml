@@ -6,6 +6,15 @@ ev_min: 0.03                    # minimum EV to flag any pick
 ev_min_model_only: 0.05         # minimum EV when there's no consensus
 model_only_shrink: 0.50         # pull model prob this far toward DK implied when no consensus
 hc_prob_min: 0.70               # high-confidence mode probability floor
+# Sanity cap: a pick whose EV is above this is held back (logged, never staked or used as a
+# parlay leg). Disagreeing with the market by that much usually means the model is missing
+# news (a role change, a minutes limit), not that DraftKings is wrong.
+max_edge: 0.15
+# Milestone (alt-line "N+") rungs are flagged only where the model's probability lies in
+# this band: the range the 2024-25 tail check validated. Further-out rungs are priced from
+# the model's far tail alone (it overstated longshots: "45+ points" parlay legs at +118%).
+milestone_p_min: 0.20
+milestone_p_max: 0.92
 kelly_fraction: 0.25            # quarter Kelly
 max_bet_pct: 0.02               # cap per single, fraction of bankroll
 max_parlay_pct: 0.01            # cap per satellite parlay

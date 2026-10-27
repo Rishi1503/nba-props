@@ -45,6 +45,9 @@ class Rules:
     ev_min_model_only: float = 0.05
     model_only_shrink: float = 0.5
     hc_prob_min: float = 0.70
+    max_edge: float = 0.15  # EV above this is held back: the model is likely missing news
+    milestone_p_min: float = 0.20  # milestone rungs flagged only inside this model-probability
+    milestone_p_max: float = 0.92  # band (the far tail priced from the model alone overstated)
     kelly_fraction: float = 0.25
     max_bet_pct: float = 0.02
     max_game_pct: float = 0.04
@@ -191,6 +194,8 @@ def decide(m: pd.DataFrame, rules: Rules) -> pd.DataFrame:
     threshold = np.where(has_cons, rules.ev_min, rules.ev_min_model_only)
     low = res["low_confidence"].fillna(False).astype(bool).to_numpy()
     res["flag"] = (res["ev"].to_numpy() >= threshold) & res["agree"].to_numpy() & ~low
+    res["held_back"] = res["flag"] & (res["ev"].to_numpy() > rules.max_edge)
+    res["flag"] &= ~res["held_back"]
     res["ev_if_plays"] = scen.get("in", np.full(len(res), np.nan))
     res["ev_if_sits"] = scen.get("out", np.full(len(res), np.nan))
     res["flag"] &= questionable_ok(res, rules)
@@ -307,7 +312,9 @@ def milestone_candidates(grids: pd.DataFrame, board: pd.DataFrame, rules: Rules)
             f_in, f_out = fair_from(sc["in"]), fair_from(sc["out"])
             ev_in, ev_out = f_in * (d - 1) - (1 - f_in), f_out * (d - 1) - (1 - f_out)
         low = bool(info.get("low_confidence", False))
-        flag = ev >= thr and not low
+        in_band = rules.milestone_p_min <= p_model <= rules.milestone_p_max
+        held = ev >= thr and not low and in_band and ev > rules.max_edge
+        flag = ev >= thr and not low and in_band and not held
         rows.append(
             {
                 **{
@@ -332,6 +339,7 @@ def milestone_candidates(grids: pd.DataFrame, board: pd.DataFrame, rules: Rules)
                 "has_consensus": bool(anchor),
                 "agree": True,
                 "flag": flag,
+                "held_back": held,
                 "high_confidence": flag and p_model >= rules.hc_prob_min,
                 "kelly": min(
                     kelly_with_push(p_fair, 1 - p_fair, d, rules.kelly_fraction), rules.max_bet_pct

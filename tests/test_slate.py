@@ -389,3 +389,19 @@ def test_the_printed_board_shows_player_names(capsys):
         res = slate.price_slate(s, DAY, NOW, CFG, write=False)
     board = prun.render(res, {CADE: "Cade Cunningham"})
     assert "Cade Cunningham" in board and f"{CADE} pts" not in board
+
+
+@pytest.mark.db
+def test_the_shipped_cap_holds_back_the_synthetic_slates_big_edges():
+    """The suite runs uncapped (tests/conftest.py); the strategy actually shipped holds back
+    every pick with an edge above max_edge, logs nothing as a pick, and says so on the board."""
+    from tests.conftest import SHIPPED_STRATEGY
+
+    shipped = load_strategy(SHIPPED_STRATEGY)
+    seed()
+    with session_scope() as s:
+        uncapped = slate.price_slate(s, DAY, NOW, CFG, write=False)
+        capped = slate.price_slate(s, DAY, NOW, shipped, write=False)
+    big = uncapped.picks[uncapped.picks["ev"] > shipped.max_edge]
+    assert len(big) and capped.held_back >= len(big)
+    assert not len(capped.picks) or (capped.picks["ev"] <= shipped.max_edge).all()

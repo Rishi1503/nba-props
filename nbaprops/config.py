@@ -17,6 +17,9 @@ class StrategyConfig(BaseModel):
     ev_min_model_only: float = Fraction
     model_only_shrink: float = Fraction
     hc_prob_min: float = Fraction
+    max_edge: float = Field(gt=0.0)
+    milestone_p_min: float = Fraction
+    milestone_p_max: float = Fraction
     kelly_fraction: float = Field(gt=0.0, le=1.0)
     max_bet_pct: float = Fraction
     max_parlay_pct: float = Fraction
@@ -43,6 +46,10 @@ class StrategyConfig(BaseModel):
             raise ValueError("caps must satisfy max_bet_pct <= max_game_pct <= max_daily_pct")
         if self.ev_min_model_only < self.ev_min:
             raise ValueError("ev_min_model_only should not be lower than ev_min")
+        if self.max_edge <= self.ev_min_model_only:
+            raise ValueError("max_edge must be above the EV floors")
+        if not self.milestone_p_min < self.milestone_p_max:
+            raise ValueError("milestone_p_min must be below milestone_p_max")
         return self
 
 

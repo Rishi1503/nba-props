@@ -38,6 +38,11 @@ def render(res: slate.SlateResult, names: dict[int, str] | None = None) -> str:
             f"  {res.blocked_questionable} props blocked only by the Questionable-teammate "
             "rule (not +EV whichever way the injury news goes)"
         )
+    if res.held_back:
+        out.append(
+            f"  {res.held_back} props held back: edge above the sanity cap (the model is "
+            "likely missing news, such as a role change or a minutes limit)"
+        )
     if res.blocked_low_confidence:
         out.append(
             f"  {res.blocked_low_confidence} props cleared every rule except low "

@@ -342,12 +342,13 @@ def test_the_replay_runs_the_daily_schedule_with_first_flag_wins():
     )
     model = MODEL.copy()
     model.loc[model["player_id"] == B, ["p_over", "p_under"]] = [0.60, 0.40]
-    _, picks = layer_b.replay(model, moved, GAMES, outcomes(), engine.Rules())
+    no_cap = engine.Rules(max_edge=10.0)  # this example's edge is above the cap
+    _, picks = layer_b.replay(model, moved, GAMES, outcomes(), no_cap)
     by = picks.set_index("player_id")
     assert by.loc[A, "flag_time"] == "10:00"  # A flagged at 10, never again
     assert by.loc[B, "flag_time"] == "15:00" and by.loc[B, "price"] == 120
     assert len(picks) == 2
-    only_morning = layer_b.replay(model, moved, GAMES, outcomes(), engine.Rules(), "10:00")[1]
+    only_morning = layer_b.replay(model, moved, GAMES, outcomes(), no_cap, "10:00")[1]
     assert list(only_morning["player_id"]) == [A]
     rep = layer_b.report(picks, picks)
     assert set(rep["by_flag_time"]) == {"10:00", "15:00"} and "standard" in rep
