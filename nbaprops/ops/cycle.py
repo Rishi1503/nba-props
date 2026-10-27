@@ -52,6 +52,8 @@ class Deps:
     # only a cycle starting in the first minutes of a pricing hour prices (is_pricing_run).
     pricing_due: Callable | None = None
     full_snapshot: Callable | None = None  # (now) -> None: every game's odds, before pricing
+    pretip_games: Callable | None = None  # (session, now) -> game ids due their pre-tip pass
+    mark_pretip: Callable | None = None  # (session, game_ids, now): those passes are done
 
 
 @dataclass
@@ -64,6 +66,38 @@ class CycleReport:
 def is_pricing_run(now: datetime) -> bool:
     local = now.astimezone(ET)
     return local.hour in PRICING_HOURS_ET and local.minute < TICK_MINUTES
+
+
+PRETIP_WINDOW = (timedelta(minutes=30), timedelta(minutes=120))
+
+
+def pretip_games_in(session, now: datetime) -> list[str]:
+    """Games tipping 30-120 minutes from now that haven't had their pre-tip pass: one more
+    projection and pricing after most injury news and close to lineups, when the scheduled
+    10 AM, 3 PM and 6 PM runs are hours old. The window is wide so a late GitHub start
+    still lands in it; each game is priced this way once (marked in alert_log)."""
+    lo, hi = PRETIP_WINDOW
+    return list(
+        session.execute(
+            text("""SELECT g.game_id FROM games g
+                    WHERE g.tip_time BETWEEN :lo AND :hi AND g.status <> 'final'
+                      AND NOT EXISTS (SELECT 1 FROM alert_log a
+                                      WHERE a.key = 'pretip:' || g.game_id)
+                    ORDER BY g.tip_time"""),
+            {"lo": now + lo, "hi": now + hi},
+        )
+        .scalars()
+        .all()
+    )
+
+
+def mark_pretip_in(session, game_ids: list[str], now: datetime) -> None:
+    for gid in game_ids:
+        session.execute(
+            text("""INSERT INTO alert_log (key, first_sent, last_seen, count)
+                    VALUES (:k, :t, :t, 1) ON CONFLICT (key) DO NOTHING"""),
+            {"k": f"pretip:{gid}", "t": now},
+        )
 
 
 def pricing_due_in(session, now: datetime) -> bool:
@@ -143,6 +177,18 @@ def run_cycle(session_factory, now: datetime, deps: Deps, notifier: alerts.Notif
         pulled = (
             step("pulls", lambda: _with(session_factory, lambda s: deps.pulled_games(s, now))) or {}
         )
+        pretip = []
+        if deps.pretip_games:
+            pretip = (
+                step("pretip", lambda: _with(session_factory, lambda s: deps.pretip_games(s, now)))
+                or []
+            )
+            pretip = [g for g in pretip if g not in changed]  # re-projected below anyway
+        if pretip:
+            step(
+                "pretip_project",
+                lambda: _with(session_factory, lambda s: deps.project(s, today, now, pretip)),
+            )
         if changed:
             notifier.send(
                 "Injury news: "
@@ -160,8 +206,14 @@ def run_cycle(session_factory, now: datetime, deps: Deps, notifier: alerts.Notif
                 "DraftKings pulled props (possible late scratch): "
                 + "; ".join(f"{g}: {', '.join(names)}" for g, names in pulled.items())
             )
-        if changed or pulled:
-            step("reprice", lambda: _price_and_alert("Late-change picks"))
+        if changed or pulled or pretip:
+            label = "Late-change picks" if (changed or pulled) else "Pre-tip picks"
+            step("reprice", lambda: _price_and_alert(label))
+            if pretip and "reprice" in rep.actions and deps.mark_pretip:
+                step(
+                    "pretip_done",
+                    lambda: _with(session_factory, lambda s: deps.mark_pretip(s, pretip, now)),
+                )
 
     def _health():
         with session_factory() as s:
@@ -386,6 +438,8 @@ def real_deps(provider, cfg) -> Deps:
     return Deps(
         tick=lambda now: tick(provider, now),
         full_snapshot=lambda now: odds_snapshot(provider, now),
+        pretip_games=pretip_games_in,
+        mark_pretip=mark_pretip_in,
         pricing_due=lambda now: _with(session_scope, lambda s: pricing_due_in(s, now)),
         settle=settle,
         project=project,

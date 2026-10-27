@@ -325,3 +325,33 @@ def test_a_late_cycle_still_prices_and_an_early_one_never_prices_twice():
     deps.pricing_due = lambda now: False  # already priced since 10:00
     cycle.run_cycle(session_scope, PRICING, deps, rec)  # 10:00 exactly: the old window
     assert "price" not in names(fake) and "project" not in names(fake)
+
+
+@pytest.mark.db
+def test_a_game_is_due_its_pre_tip_pass_once_in_the_window():
+    """One more projection and pricing 30-120 minutes before tip, after most injury news; a
+    late GitHub start still lands in the wide window, and each game gets it once."""
+    from tests.test_slate import TIP1
+
+    seed()
+    with session_scope() as s:
+        assert G1 in cycle.pretip_games_in(s, TIP1 - timedelta(minutes=60))
+        assert G1 not in cycle.pretip_games_in(s, TIP1 - timedelta(hours=3))  # too early
+        cycle.mark_pretip_in(s, [G1], TIP1 - timedelta(minutes=60))
+    with session_scope() as s:
+        assert G1 not in cycle.pretip_games_in(s, TIP1 - timedelta(minutes=40))  # done once
+
+
+@pytest.mark.db
+def test_the_cycle_runs_the_pre_tip_pass_and_retries_it_if_pricing_fails():
+    seed()
+    rec = alerts.RecordingNotifier()
+    for fail, marked in ((set(), True), ({"price"}, False)):
+        fake = Fake(fail=fail)
+        deps = fake.deps()
+        deps.pricing_due = lambda now: False  # between the scheduled pricing runs
+        deps.pretip_games = lambda s, now: [G1]
+        deps.mark_pretip = lambda s, ids, now, f=fake: f.calls.append(("mark", tuple(ids)))
+        cycle.run_cycle(session_scope, PRICING + timedelta(hours=7), deps, rec)
+        assert ("project", [G1]) in fake.calls and "price" in names(fake)
+        assert (("mark", (G1,)) in fake.calls) == marked  # a failed pricing is retried later
