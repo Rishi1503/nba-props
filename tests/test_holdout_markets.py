@@ -78,7 +78,7 @@ def fake_training(monkeypatch, seen):
 
     monkeypatch.setattr(run.wf, "run", walk)
 
-    def build(df, oos, run_id, first, features=None, oos_cal=None):
+    def build(df, oos, run_id, first, features=None):
         seen["production_features"] = features
         return FakeBundle(run_id)
 

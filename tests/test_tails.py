@@ -85,28 +85,3 @@ def test_a_narrow_calibrator_no_longer_creates_a_tail_pile_up():
     ]
     out = tails.tail_report(tails.favored_points(grids, rows))
     assert out["passes"], out["failures"]
-
-
-def test_the_hybrid_keeps_the_core_inside_and_the_tail_beyond():
-    """One curve fit on everything traded main-line calibration for the tails (2024-25: points
-    ECE 0.8% -> 1.9%). The hybrid keeps the core exactly where it was fit, the tail beyond."""
-    from nbaprops.models.calibrate import Calibrator
-
-    core = Calibrator(
-        {"pts": ([0.35, 0.5, 0.65], [0.33, 0.5, 0.62]), "reb": ([0.3, 0.7], [0.3, 0.7])}
-    )
-    tail = Calibrator(
-        {
-            "pts": ([0.05, 0.35, 0.65, 0.95], [0.04, 0.36, 0.68, 0.97]),
-            "ast": ([0.1, 0.9], [0.12, 0.88]),
-        }
-    )
-    h = Calibrator.hybrid(core, tail)
-    inside = np.linspace(0.36, 0.64, 29)
-    assert np.allclose(h.apply("pts", inside), core.apply("pts", inside), atol=2e-3)
-    far = np.array([0.05, 0.12, 0.88, 0.95])
-    assert np.allclose(h.apply("pts", far), tail.apply("pts", far), atol=2e-3)
-    out = h.apply("pts", np.linspace(0.001, 0.999, 2000))
-    assert np.all(np.diff(out) >= -1e-12)  # never reorders probabilities
-    assert np.max(np.abs(np.diff(out))) < 0.01  # continuous: no jump at the edges
-    assert h.curves["reb"] == core.curves["reb"] and h.curves["ast"] == tail.curves["ast"]

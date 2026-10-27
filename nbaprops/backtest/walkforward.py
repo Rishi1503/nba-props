@@ -399,21 +399,15 @@ def run_block(
 
 
 def run_season(
-    df: pd.DataFrame,
-    season: str,
-    settings: Settings,
-    seed_lines: pd.DataFrame | None = None,
-    seed_cal: pd.DataFrame | None = None,
+    df: pd.DataFrame, season: str, settings: Settings, seed_lines: pd.DataFrame | None = None
 ) -> Result:
     """Walk-forward over `season`. `df` is the full training frame (every season loaded);
-    `seed_lines` / `seed_cal` are earlier out-of-sample test and calibration lines that start
-    the calibrator: a hybrid of a core fit on test lines and a tail fit on calibration lines."""
+    `seed_lines` are earlier out-of-sample calibration lines that start the calibrator."""
     features = list(settings.features or FEATURE_COLUMNS)
     df = df[(df["season_type"] != "preseason") & df["y_minutes"].notna()]
     target = df[df["season"] == season]
     eligible = df[df["season"] >= settings.first_train_season]
     prior = seed_lines.copy() if seed_lines is not None else pd.DataFrame()
-    prior_cal = seed_cal.copy() if seed_cal is not None else pd.DataFrame()
     lines, rows, mins, priced, grid_parts, cal_parts, info = [], [], [], [], [], [], []
     for start, end in blocks(target["game_date"], settings.retrain_days):
         train = eligible[eligible["game_date"] < start]
@@ -422,7 +416,7 @@ def run_season(
             continue
         history = df[df["game_date"] < end]  # exit rates only count games before each row
         models = train_models(train, history, features, settings.cache_dir, start)
-        cal = calibrate.Calibrator.hybrid(_calibrator(prior), _calibrator(prior_cal))
+        cal = _calibrator(prior)
         k = {m: baseline_scale(train.dropna(subset=[f"y_{m}"]), m) for m in MARKETS}
         label = f"{start:%Y-%m-%d}"
         bl, br, bm, bp, bg, bc = run_block(frame, models[:3], cal, k, history, settings, label)
@@ -433,8 +427,7 @@ def run_season(
         rows.append(br)
         mins.append(bm)
         cal_parts.append(bc)
-        prior = pd.concat([prior, bl], ignore_index=True)  # later blocks calibrate on these
-        prior_cal = pd.concat([prior_cal, bc], ignore_index=True)
+        prior = pd.concat([prior, bc], ignore_index=True)  # later blocks calibrate on these
         info.append(
             {
                 "block": label,
@@ -471,6 +464,5 @@ def run(
     before = prev_season(season)
     if warmup and before > settings.first_train_season and (df["season"] == before).any():
         warm = run_season(df, before, settings)
-    if warm is None:
-        return run_season(df, season, settings), warm
-    return run_season(df, season, settings, warm.lines, warm.cal_lines), warm
+    seed = warm.cal_lines if warm is not None else None
+    return run_season(df, season, settings, seed), warm

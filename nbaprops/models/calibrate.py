@@ -43,31 +43,6 @@ class Calibrator:
                 curves[market] = _isotonic(p, y)
         return cls(curves)
 
-    @classmethod
-    def hybrid(cls, core: "Calibrator", tail: "Calibrator", blend: float = 0.10) -> "Calibrator":
-        """`core` inside the range it was fit on, `tail` beyond it, blended over `blend` of
-        probability at each edge. The core is fit on test lines near each player's typical
-        output, where the Stage 5 targets pass; the tail on lines across each distribution
-        (the 2024-25 tail check: one curve fit on everything traded main-line calibration for
-        the tails). Stored as one ordinary curve per market, never reordering probabilities."""
-        grid = np.round(np.linspace(0.001, 0.999, 999), 6)
-        curves = {}
-        for market in sorted(set(core.curves) | set(tail.curves)):
-            if market not in tail.curves:
-                curves[market] = core.curves[market]
-                continue
-            if market not in core.curves:
-                curves[market] = tail.curves[market]
-                continue
-            lo, hi = float(core.curves[market][0][0]), float(core.curves[market][0][-1])
-            w = np.ones_like(grid)  # weight on the core curve
-            w = np.where(grid < lo, np.clip(1 - (lo - grid) / blend, 0, 1), w)
-            w = np.where(grid > hi, np.clip(1 - (grid - hi) / blend, 0, 1), w)
-            y = w * core.apply(market, grid) + (1 - w) * tail.apply(market, grid)
-            y = np.clip(np.maximum.accumulate(y), P_MIN, P_MAX)
-            curves[market] = (grid.tolist(), y.tolist())
-        return cls(curves)
-
     def apply(self, market: str, p: np.ndarray) -> np.ndarray:
         p = np.asarray(p, dtype=float)
         if market not in self.curves:
