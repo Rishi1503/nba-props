@@ -277,6 +277,26 @@ def render_markdown(report: dict) -> str:
         f"({mn['mae_improvement']:+.1%}); 80% interval coverage {mn['coverage_80']:.1%}.",
         "",
     ]
+    ab = a.get("absence_bias")
+    if ab:
+        lines += [
+            "## Teammate absences: projection bias",
+            "",
+            "Rotation minutes missing from the player's team. Bias = actual vs projected; a "
+            "positive bias growing with missing minutes means players stepping up are "
+            "under-projected (unders flagged where lines rose). z is player-clustered.",
+            "",
+            "| Market | Missing | Rows | Players | Projected | Actual | Bias | z |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        for m, buckets in ab.items():
+            for b in buckets:
+                lines.append(
+                    f"| {m} | {b['bucket']} | {b['rows']} | {b['players']} | "
+                    f"{b['projected']:.2f} | {b['actual']:.2f} | {b['bias_pct']:+.1%} | "
+                    f"{b['z']:+.2f} |"
+                )
+        lines.append("")
     lb = report.get("layer_b")
     if lb:
         lines += ["## Betting replay (Layer B)", ""]

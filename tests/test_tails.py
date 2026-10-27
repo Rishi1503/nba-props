@@ -85,3 +85,30 @@ def test_a_narrow_calibrator_no_longer_creates_a_tail_pile_up():
     ]
     out = tails.tail_report(tails.favored_points(grids, rows))
     assert out["passes"], out["failures"]
+
+
+def test_absence_bias_finds_the_players_stepping_up():
+    """Players at the missing starter's position beat their projection by 10%; everyone else is
+    projected right. The diagnostic must point at exactly that slice."""
+    from nbaprops.backtest import metrics
+
+    rng = np.random.default_rng(5)
+    n = 6000
+    out_min = rng.choice([0.0, 8.0, 34.0], n)
+    same = (out_min > 15) & (rng.random(n) < 0.5)
+    mean = rng.uniform(8, 25, n)
+    y = rng.normal(mean * np.where(same, 1.10, 1.0), 3.0)
+    rows = pd.DataFrame(
+        {
+            "market": "pts",
+            "player_id": rng.integers(0, 400, n),
+            "mean": mean,
+            "y": y,
+            "teammates_out_min": out_min,
+            "same_pos_out_min": np.where(same, 30.0, 0.0),
+        }
+    )
+    b = {x["bucket"]: x for x in metrics.absence_bias(rows)["pts"]}
+    assert abs(b["none"]["bias_pct"]) < 0.02
+    assert b["15+ min, same position"]["bias_pct"] > 0.07 and b["15+ min, same position"]["z"] > 4
+    assert abs(b["15+ min, other position"]["bias_pct"]) < 0.02

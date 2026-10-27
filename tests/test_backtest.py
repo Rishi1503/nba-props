@@ -562,3 +562,5 @@ def test_command_line_tail_calibration(frame, tmp_path):
     assert rep["settings"]["without"] == "roster"
     md = (tmp_path / "reports" / "backtest" / f"{rep['run_id']}.md").read_text()
     assert "Tail calibration" in md
+    assert "Teammate absences: projection bias" in md  # the diagnostic is in every report
+    assert rep["layer_a"]["absence_bias"]["pts"]

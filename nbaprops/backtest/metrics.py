@@ -159,6 +159,52 @@ def minutes_report(mins: pd.DataFrame) -> dict:
     }
 
 
+ABSENCE_BUCKETS = ((0, 0, "none"), (0, 15, "1-15 min"), (15, 30, "15-30 min"), (30, 1e9, "30+ min"))
+
+
+def absence_bias(rows: pd.DataFrame) -> dict:
+    """Projection bias by how many rotation minutes the player's team is missing: mean actual
+    vs mean projected, and a player-clustered z for the gap. A model that doesn't know who
+    absorbs a missing starter's role under-projects the players stepping up (actual above
+    projected as more minutes go missing), so its picks lean under exactly where lines rose."""
+    out = {}
+    if "teammates_out_min" not in rows:
+        return out
+    for m in MARKETS:
+        r = rows[(rows["market"] == m) & np.isfinite(rows["y"].astype(float))]
+        part = []
+        x = r["teammates_out_min"].astype(float)
+        same = r.get("same_pos_out_min", pd.Series(0.0, index=r.index)).astype(float) > 0
+        slices = [
+            (name, r[(x <= 0)] if name == "none" else r[(x > lo) & (x <= hi)])
+            for lo, hi, name in ABSENCE_BUCKETS
+        ]
+        # who absorbs the role: players at the missing player's position vs the rest
+        slices += [
+            ("15+ min, same position", r[(x > 15) & same]),
+            ("15+ min, other position", r[(x > 15) & ~same]),
+        ]
+        for name, b in slices:
+            if len(b) < 50:
+                continue
+            resid = b["y"].astype(float) - b["mean"].astype(float)
+            per_player = resid.groupby(b["player_id"]).sum()
+            se = max(float(np.sqrt((per_player**2).sum())) / len(b), 1e-9)
+            part.append(
+                {
+                    "bucket": name,
+                    "rows": int(len(b)),
+                    "players": int(b["player_id"].nunique()),
+                    "projected": round(float(b["mean"].mean()), 3),
+                    "actual": round(float(b["y"].astype(float).mean()), 3),
+                    "bias_pct": round(float(resid.mean() / b["mean"].mean()), 4),
+                    "z": round(float(resid.mean()) / se, 2),
+                }
+            )
+        out[m] = part
+    return out
+
+
 def layer_a(res) -> dict:
     """Full Layer A report for one walk-forward Result."""
     report = {
@@ -176,6 +222,7 @@ def layer_a(res) -> dict:
             "pit": pit_summary(r["pit"].to_numpy()),
             "breakdowns": _breakdowns(r, ln),
         }
+    report["absence_bias"] = absence_bias(res.rows)
     report["targets"] = stage5_targets(report)
     return report
 

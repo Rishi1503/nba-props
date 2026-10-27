@@ -321,6 +321,13 @@ def run_block(
                         "pit": pits[m],
                         "baseline": baseline_mean(f, m),
                         "roster_change": changed,
+                        # rotation minutes missing from the player's team (pre-game known)
+                        "teammates_out_min": f["absent_min_sum"].fillna(0).to_numpy(float)
+                        if "absent_min_sum" in f
+                        else 0.0,
+                        "same_pos_out_min": f["same_pos_absent_min"].fillna(0).to_numpy(float)
+                        if "same_pos_absent_min" in f
+                        else 0.0,
                     }
                 )
             )
