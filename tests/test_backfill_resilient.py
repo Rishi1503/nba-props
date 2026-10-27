@@ -306,3 +306,79 @@ def test_stats_day_catches_up_missed_days(stats_db):  # noqa: F811
         for gid in ("x1", "x3"):
             s.add(TeamGameLog(game_id=gid, team_id=1610612738))
     assert stats.catch_up_start("2025-26", day) == day  # nothing missing: just yesterday
+
+
+@pytest.mark.db
+def test_duplicate_rows_in_one_batch_are_saved_once(stats_db):  # noqa: F811
+    """A date-range response listed the same player-game twice: Postgres refused the whole batch
+    (CardinalityViolation). The last copy is kept."""
+    from datetime import date
+
+    from sqlalchemy import select
+
+    from nbaprops.db.models import PlayerGameLog
+
+    with session_scope() as s:
+        s.add(
+            Game(
+                game_id="d1",
+                season="2025-26",
+                season_type="regular",
+                game_date=date(2026, 1, 5),
+                tip_time=None,
+                home_team_id=1610612738,
+                away_team_id=1610612752,
+                status="final",
+            )
+        )
+    row = {
+        "game_id": "d1",
+        "player_id": 1628369,
+        "team_id": 1610612738,
+        "dnp": False,
+        "minutes": 30.0,
+        "pts": 10,
+    }
+    with session_scope() as s:
+        stats._upsert(
+            s,
+            PlayerGameLog,
+            [row, {**row, "pts": 25}],
+            ["game_id", "player_id"],
+            ["pts", "minutes"],
+        )
+    with session_scope() as s:
+        assert s.scalars(select(PlayerGameLog.pts).where(PlayerGameLog.game_id == "d1")).all() == [
+            25
+        ]
+
+
+@pytest.mark.db
+def test_preseason_gaps_do_not_drag_the_catch_up_back(stats_db):  # noqa: F811
+    """Preseason games against non-NBA teams never get NBA game logs, so the catch-up kept
+    reaching back to them on every run (reloading the whole preseason)."""
+    from datetime import date
+
+    from nbaprops.db.models import TeamGameLog
+
+    def game(gid, d, kind):
+        return Game(
+            game_id=gid,
+            season="2025-26",
+            season_type=kind,
+            game_date=d,
+            tip_time=None,
+            home_team_id=1610612738,
+            away_team_id=1610612752,
+            status="final",
+        )
+
+    day = date(2026, 1, 10)
+    with session_scope() as s:
+        s.add_all(
+            [game("p1", date(2026, 1, 2), "preseason"), game("r1", date(2026, 1, 9), "regular")]
+        )
+    assert stats.catch_up_start("2025-26", day) == date(2026, 1, 9)  # the regular gap only
+    with session_scope() as s:
+        s.add(TeamGameLog(game_id="r1", team_id=1610612738))
+    assert stats.catch_up_start("2025-26", day) == day

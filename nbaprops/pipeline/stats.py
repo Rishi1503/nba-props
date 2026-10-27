@@ -405,7 +405,15 @@ def validate(team_logs: Rows, player_logs: Rows, tolerance_min: float = 1.5) -> 
 # --- Database writes ---------------------------------------------------------
 
 
+def _dedupe(rows: Rows, keys: list[str]) -> Rows:
+    """One row per key, the last one kept. A date-range response from the stats site can list
+    the same player-game twice, and Postgres refuses to update one row twice in a single
+    statement (CardinalityViolation, Oct 27, 2026)."""
+    return list({tuple(r[k] for k in keys): r for r in rows}.values())
+
+
 def _upsert(session: Session, model, rows: Rows, keys: list[str], update_cols: list[str]):
+    rows = _dedupe(rows, keys)
     for i in range(0, len(rows), 2000):  # stay under Postgres' bind-parameter limit
         chunk = rows[i : i + 2000]
         stmt = insert(model).values(chunk)
@@ -679,7 +687,7 @@ def catch_up_start(season: str, day: date) -> date:
                 Game.season == season,
                 Game.game_date >= day - timedelta(days=RETRY_DAYS),
                 Game.game_date <= day,
-                Game.season_type != "cup_final",
+                Game.season_type.notin_(["cup_final", "preseason"]),  # gaps there never fill
                 # game logs, not box scores: a box score alone only adds the players who
                 # did NOT play, and that wrongly passed as "loaded" (Oct 22 picks voided)
                 ~select(TeamGameLog.game_id).where(TeamGameLog.game_id == Game.game_id).exists(),
