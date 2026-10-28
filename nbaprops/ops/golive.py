@@ -8,6 +8,11 @@ item passes:
   4. the pipeline ran 14 straight days: every cycle succeeded and no manual fix was recorded
      (a day with no cycles at all breaks the streak)
   5. a bankroll is recorded and fixed: no deposits or withdrawals since the first entry
+
+Kill rule, checked beside it: average CLV with a day-clustered confidence interval (picks on
+one day share games and news). Stop early at 150+ picks over 3+ weeks if the 99% interval is
+entirely below zero; stop at 300+ picks over 4+ weeks if the 95% interval is; and stop at
+600+ picks if average CLV is still not above zero (an edge worth betting would show by then).
 """
 
 from dataclasses import asdict, dataclass
@@ -26,6 +31,10 @@ ECE_MAX = 0.03
 BUCKET_MAX = 0.08
 BUCKET_MIN_N = 20
 CLEAN_DAYS = 14
+# kill rule: (picks, weeks, z) stages; the last stage stops if average CLV isn't positive
+KILL_EARLY = (150, 3, 2.576)
+KILL_FULL = (300, 4, 1.96)
+KILL_NO_EDGE = 600
 
 
 @dataclass
@@ -130,6 +139,56 @@ def check_bankroll(session) -> Criterion:
     )
 
 
+def kill_check(df: pd.DataFrame, today: date) -> dict:
+    """Whether the paper record says to stop: the model is losing to closing lines, or has had
+    a large sample without showing an edge. CLV is per pick; the interval is clustered by day."""
+    d = df[df["clv"].notna()]
+    n = int(len(d))
+    first = min(d["game_date"]) if n else None
+    weeks = (today - first).days / 7 if first else 0.0
+    out = {
+        "verdict": "too early",
+        "picks": n,
+        "weeks": round(weeks, 1),
+        "avg_clv": None,
+        "low": None,
+        "high": None,
+        "reason": "",
+    }
+    if not n:
+        out["reason"] = "no CLV yet"
+        return out
+    clv = d["clv"].astype(float)
+    avg = float(clv.mean())
+    by_day = (clv - avg).groupby(d["game_date"]).sum()
+    se = float(np.sqrt((by_day**2).sum())) / n if len(by_day) > 1 else float("inf")
+    out["avg_clv"] = round(avg, 5)
+
+    def interval(z):
+        return avg - z * se, avg + z * se
+
+    lo95, hi95 = interval(1.96)
+    if np.isfinite(se):
+        out["low"], out["high"] = round(lo95, 5), round(hi95, 5)
+    early_n, early_w, early_z = KILL_EARLY
+    full_n, full_w, full_z = KILL_FULL
+    if n < early_n or weeks < early_w:
+        out["reason"] = f"needs {early_n}+ picks over {early_w}+ weeks"
+    elif n >= KILL_NO_EDGE and avg <= 0:
+        out["verdict"] = "STOP"
+        out["reason"] = f"{n} picks and average CLV is still not positive: no edge to bet"
+    elif n >= full_n and weeks >= full_w and interval(full_z)[1] < 0:
+        out["verdict"] = "STOP"
+        out["reason"] = "95% interval for average CLV is entirely below zero"
+    elif interval(early_z)[1] < 0:
+        out["verdict"] = "STOP"
+        out["reason"] = "99% interval for average CLV is entirely below zero (early stop)"
+    else:
+        out["verdict"] = "keep going"
+        out["reason"] = "not clearly losing to closing lines yet"
+    return out
+
+
 def checklist(session, today: date) -> dict:
     df = _picks(session, today)
     items = [
@@ -139,15 +198,33 @@ def checklist(session, today: date) -> dict:
         check_pipeline(session, today),
         check_bankroll(session),
     ]
+    kill = kill_check(df, today)
     return {
         "date": str(today),
-        "ready": all(c.ok for c in items),
+        "ready": all(c.ok for c in items) and kill["verdict"] != "STOP",
         "criteria": [asdict(c) for c in items],
+        "kill": kill,
     }
 
 
 def render(result: dict) -> str:
     out = [f"Go-live check {result['date']}: {'READY' if result['ready'] else 'not yet'}"]
+    k = result.get("kill")
+    if k:
+        span = (
+            f"; average CLV {k['avg_clv']:+.2%} (95% {k['low']:+.2%} to {k['high']:+.2%})"
+            if k["avg_clv"] is not None and k["low"] is not None
+            else ""
+        )
+        out.append(
+            f"Kill rule: {k['verdict'].upper()} - {k['picks']} picks over {k['weeks']} weeks"
+            f"{span}. {k['reason']}"
+        )
+        if k["verdict"] == "STOP":
+            out.append(
+                "The model is not beating DraftKings' closing lines. Stop paper trading and "
+                "don't bet real money; more tuning on the same data would be fitting noise."
+            )
     for c in result["criteria"]:
         out.append(f"[{'x' if c['ok'] else ' '}] {c['name']}: {c['value']}")
     if not result["ready"]:

@@ -390,3 +390,39 @@ def test_the_review_splits_unders_on_role_changes_and_rising_lines():
     assert sr["by_side_role"]["over, untagged"]["bets"] == 310
     assert sr["by_side_line_move"]["under, line rose 1+"]["bets"] == 40
     assert "under, key teammate out" in review.render(rep)
+
+
+def _clv_record(days, per_day, mean, sd, start=date(2026, 10, 21), seed=3):
+    rng = np.random.default_rng(seed)
+    rows = [
+        {"game_date": start + timedelta(days=d), "clv": rng.normal(mean, sd)}
+        for d in range(days)
+        for _ in range(per_day)
+    ]
+    df = pd.DataFrame(rows)
+    return df.assign(clv=df["clv"] - df["clv"].mean() + mean)  # exactly this average
+
+
+def test_kill_rule_waits_for_enough_picks():
+    df = _clv_record(10, 10, -0.05, 0.04)  # clearly negative, but 100 picks in 10 days
+    k = golive.kill_check(df, date(2026, 10, 31))
+    assert k["verdict"] == "too early"
+
+
+def test_kill_rule_stops_a_model_losing_to_closing_lines():
+    df = _clv_record(35, 9, -0.02, 0.05)  # 315 picks over 5 weeks, losing 2% to the close
+    k = golive.kill_check(df, date(2026, 11, 25))
+    assert k["verdict"] == "STOP" and k["high"] < 0
+    assert "STOP" in golive.render({"date": "x", "ready": False, "criteria": [], "kill": k})
+
+
+def test_kill_rule_keeps_going_when_clv_is_unclear_or_positive():
+    for mean in (-0.002, 0.01):
+        df = _clv_record(35, 9, mean, 0.05)
+        assert golive.kill_check(df, date(2026, 11, 25))["verdict"] == "keep going"
+
+
+def test_kill_rule_stops_when_a_big_sample_shows_no_edge():
+    df = _clv_record(70, 9, -0.001, 0.05)  # 630 picks: still not positive
+    k = golive.kill_check(df, date(2027, 1, 1))
+    assert k["verdict"] == "STOP" and "no edge" in k["reason"]
