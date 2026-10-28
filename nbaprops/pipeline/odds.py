@@ -256,6 +256,9 @@ class PropLineProvider:
         quota_reserve: int = 100,
         timeout: float = 20.0,
         session: requests.Session | None = None,
+        retries: int = 2,
+        backoff: tuple[float, ...] = (2.0, 5.0),
+        sleep=None,
     ):
         if not api_key:
             raise ValueError("PROPLINE_API_KEY is not set")
@@ -265,6 +268,9 @@ class PropLineProvider:
         self.http = session or requests.Session()
         self.http.headers["X-API-Key"] = api_key
         self.last_quota: Quota | None = None
+        self.retries = retries
+        self.backoff = backoff
+        self._sleep = sleep or __import__("time").sleep
 
     def _get(
         self, path: str, params: dict[str, str] | None = None, use_reserve: bool = False
@@ -276,7 +282,21 @@ class PropLineProvider:
                 f"{q.remaining} requests left today; {self.quota_reserve} are reserved "
                 "for closing snapshots"
             )
-        resp = self.http.get(f"{self.base_url}{path}", params=params, timeout=self.timeout)
+        # Retry the transient failures (a 20 s read timeout failed the Oct 27 6 PM pricing run):
+        # timeouts, dropped connections, rate limits and server errors.
+        for attempt in range(self.retries + 1):
+            last = attempt == self.retries
+            try:
+                resp = self.http.get(f"{self.base_url}{path}", params=params, timeout=self.timeout)
+            except (requests.Timeout, requests.ConnectionError):
+                if last:
+                    raise
+                self._sleep(self.backoff[min(attempt, len(self.backoff) - 1)])
+                continue
+            if getattr(resp, "status_code", 200) in (429, 500, 502, 503, 504) and not last:
+                self._sleep(self.backoff[min(attempt, len(self.backoff) - 1)])
+                continue
+            break
         self.last_quota = parse_quota(resp.headers) or self.last_quota
         resp.raise_for_status()
         return resp.json()

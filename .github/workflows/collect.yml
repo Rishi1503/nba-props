@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: "cycle | settle | status | tick | snapshot | injuries | schedule | seed | stats-day"
+        description: "cycle | daily | settle | status | tick | snapshot | injuries | schedule | seed | stats-day"
         default: "cycle"
 
 concurrency:
@@ -51,6 +51,11 @@ jobs:
             CMD="${{ github.event.inputs.command }}"
             case "$CMD" in
               cycle|settle|status) uv run python -m nbaprops.ops.run "$CMD" ;;
+              daily) # the 9:05 AM job, for an external scheduler (GitHub's drops runs)
+                uv run python -m nbaprops.pipeline.run seed
+                uv run python -m nbaprops.pipeline.run schedule
+                uv run python -m nbaprops.pipeline.run stats-day || echo "::warning::stats-day failed from GitHub; run it locally"
+                uv run python -m nbaprops.ops.run settle ;;
               tick|snapshot|injuries|schedule|seed|stats-day) uv run python -m nbaprops.pipeline.run "$CMD" ;;
               *) echo "bad command"; exit 1 ;;
             esac
