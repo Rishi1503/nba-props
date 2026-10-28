@@ -184,6 +184,23 @@ def absence_bias(rows: pd.DataFrame) -> dict:
             ("15+ min, same position", r[(x > 15) & same]),
             ("15+ min, other position", r[(x > 15) & ~same]),
         ]
+        if "starters_out" in r and "teammates_out_usage" in r:
+            from nbaprops.features.context import key_out
+
+            key = np.array(
+                [
+                    key_out(a, b)
+                    for a, b in zip(r["starters_out"], r["teammates_out_usage"], strict=True)
+                ],
+                dtype=bool,
+            )
+            starter = r.get("started_share", pd.Series(0.0, index=r.index)).astype(float) >= 0.5
+            # a star (or two key players) out: his replacement, the starters, the bench
+            slices += [
+                ("key teammate out, same position", r[key & same.to_numpy()]),
+                ("key teammate out, starters", r[key & starter.to_numpy()]),
+                ("key teammate out, bench", r[key & ~starter.to_numpy()]),
+            ]
         for name, b in slices:
             if len(b) < 50:
                 continue

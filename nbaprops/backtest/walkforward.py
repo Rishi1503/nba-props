@@ -328,6 +328,15 @@ def run_block(
                         "same_pos_out_min": f["same_pos_absent_min"].fillna(0).to_numpy(float)
                         if "same_pos_absent_min" in f
                         else 0.0,
+                        "teammates_out_usage": f["absent_usage_sum"].fillna(0).to_numpy(float)
+                        if "absent_usage_sum" in f
+                        else 0.0,
+                        "starters_out": f["absent_starters"].fillna(0).to_numpy(float)
+                        if "absent_starters" in f
+                        else 0.0,
+                        "started_share": f["started_share_l10"].fillna(0).to_numpy(float)
+                        if "started_share_l10" in f
+                        else 0.0,
                     }
                 )
             )

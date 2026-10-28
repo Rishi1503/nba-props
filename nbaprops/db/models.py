@@ -352,6 +352,8 @@ class Projection(Base):
     # the grids if he plays / sits, at the same lines as p_over (their p_play blend). Pricing
     # uses them to require a bet to be +EV whichever way the injury news goes.
     scenarios: Mapped[dict | None] = mapped_column(JSONB)
+    # who is missing from the player's team (features.context.role_context)
+    context: Mapped[dict | None] = mapped_column(JSONB)
 
 
 # --- Betting -----------------------------------------------------------------
@@ -396,6 +398,7 @@ class Pick(Base):
     clv: Mapped[Decimal | None] = mapped_column(Numeric(7, 4))
     result: Mapped[str | None] = mapped_column(String(8))
     pnl: Mapped[Decimal | None] = mapped_column(Money)
+    context: Mapped[dict | None] = mapped_column(JSONB)  # the projection's, at flag time
 
 
 class Parlay(Base):

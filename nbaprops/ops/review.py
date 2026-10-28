@@ -35,7 +35,12 @@ def load_settled(session, start: date, end: date, mode: str = "paper") -> pd.Dat
     """Settled picks on games from `start` to `end` (boost-only legs excluded)."""
     df = pd.read_sql_query(
         text("""
-        SELECT p.*, g.game_date FROM picks p JOIN games g USING (game_id)
+        SELECT p.*, g.game_date, op.open_line FROM picks p JOIN games g USING (game_id)
+        LEFT JOIN LATERAL (
+            SELECT o.line AS open_line FROM odds_snapshots o
+            WHERE o.game_id = p.game_id AND o.player_id = p.player_id AND o.market = p.market
+              AND o.book = 'draftkings' AND o.line_type = 'main'
+            ORDER BY o.snapshot_ts LIMIT 1) op ON p.line_type = 'main'
         WHERE p.result IS NOT NULL AND p.mode = :m AND p.tier <> 'boost_leg'
           AND g.game_date BETWEEN :a AND :b"""),
         session.connection(),
@@ -50,7 +55,21 @@ def load_settled(session, start: date, end: date, mode: str = "paper") -> pd.Dat
         )
         taken = df["price_placed"].fillna(df["dk_price"]).astype(int)
         df["decimal"] = [to_decimal(x) for x in taken]
+        df["role"] = [_role(c) for c in df["context"]]
+        move = df["line"] - df["open_line"].astype(float)
+        df["line_move"] = np.select(
+            [df["open_line"].isna(), move >= 1, move <= -1],
+            ["no opening line", "line rose 1+", "line fell 1+"],
+            "line steady",
+        )
     return df
+
+
+def _role(context) -> str:
+    """Whether a key teammate was out when the pick was flagged (features.context)."""
+    if not isinstance(context, dict):
+        return "untagged"
+    return "key teammate out" if context.get("key_out") else "no key absence"
 
 
 def _clustered(x: np.ndarray, clusters: np.ndarray) -> tuple[float, float]:
@@ -188,6 +207,13 @@ def weekly_review(session, end: date, mode: str = "paper") -> dict:
             if len(df)
             else {},
             "ev_vs_clv": _ev_buckets(df) if len(df) else {},
+            # unders on players whose role grew: does the market know better there?
+            "by_side_role": _split(df.assign(k=df["side"] + ", " + df["role"]), "k")
+            if len(df)
+            else {},
+            "by_side_line_move": _split(df.assign(k=df["side"] + ", " + df["line_move"]), "k")
+            if len(df)
+            else {},
         }
     rep["parlays"] = parlay_summary(session, season_start(end), end, mode)
     rep["slippage"] = slippage(session, season_start(end), end)
@@ -261,6 +287,13 @@ def render(rep: dict) -> str:
         if s.get("bets"):
             clv = "n/a" if s.get("avg_clv") is None else f"{s['avg_clv']:+.2%}"
             out.append(f"  EV {b}: predicted {s['predicted_ev']:+.1%}, realized CLV {clv}")
+    sr = rep["season_splits"]
+    for key in ("under, key teammate out", "under, no key absence"):
+        if key in sr.get("by_side_role", {}):
+            out.append("  " + line(key, sr["by_side_role"][key]))
+    for key in ("under, line rose 1+", "under, line steady"):
+        if key in sr.get("by_side_line_move", {}):
+            out.append("  " + line(key, sr["by_side_line_move"][key]))
     if rep["market_rule"]:
         out.append(
             "Switched off (CLV negative after 100+ picks): "

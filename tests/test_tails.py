@@ -112,3 +112,51 @@ def test_absence_bias_finds_the_players_stepping_up():
     assert abs(b["none"]["bias_pct"]) < 0.02
     assert b["15+ min, same position"]["bias_pct"] > 0.07 and b["15+ min, same position"]["z"] > 4
     assert abs(b["15+ min, other position"]["bias_pct"]) < 0.02
+
+
+def test_one_definition_of_a_key_teammate_out():
+    from nbaprops.features.context import key_out, role_context
+
+    star = {
+        "absent_min_sum": 34.2,
+        "absent_usage_sum": 0.28,
+        "absent_starters": 1,
+        "same_pos_absent_min": 34.2,
+    }
+    assert role_context(star) == {
+        "team_out_min": 34.2,
+        "team_out_usage": 0.28,
+        "starters_out": 1,
+        "same_pos_out_min": 34.2,
+        "key_out": True,
+    }
+    assert key_out(1, 28.0)  # stored as a percentage: same answer
+    assert not key_out(0, 0.30)  # no starter out: bench pieces, not a role change
+    assert not key_out(1, 0.12)  # a low-usage starter
+    assert role_context({"absent_usage_sum": float("nan")})["key_out"] is False
+
+
+def test_absence_bias_has_the_key_teammate_out_slices():
+    from nbaprops.backtest import metrics
+
+    rng = np.random.default_rng(9)
+    n = 8000
+    key = rng.random(n) < 0.3
+    same = key & (rng.random(n) < 0.4)
+    mean = rng.uniform(8, 25, n)
+    rows = pd.DataFrame(
+        {
+            "market": "pts",
+            "player_id": rng.integers(0, 400, n),
+            "mean": mean,
+            "y": rng.normal(mean * np.where(same, 1.12, 1.0), 3.0),
+            "teammates_out_min": np.where(key, 34.0, 0.0),
+            "same_pos_out_min": np.where(same, 34.0, 0.0),
+            "teammates_out_usage": np.where(key, 0.27, 0.0),
+            "starters_out": np.where(key, 1.0, 0.0),
+            "started_share": rng.random(n),
+        }
+    )
+    b = {x["bucket"]: x for x in metrics.absence_bias(rows)["pts"]}
+    assert b["key teammate out, same position"]["bias_pct"] > 0.09
+    assert {"key teammate out, starters", "key teammate out, bench"} <= set(b)

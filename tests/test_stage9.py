@@ -357,3 +357,36 @@ def test_every_cycle_is_recorded():
     with session_scope() as s:
         runs = s.execute(text("SELECT ok, errors FROM ops_runs ORDER BY id")).all()
     assert [r.ok for r in runs] == [True, False] and runs[1].errors == ["odds: odds broke"]
+
+
+@pytest.mark.db
+def test_the_review_splits_unders_on_role_changes_and_rising_lines():
+    """Unders on players whose key teammate was out (and whose line rose since the morning)
+    are reported on their own, so CLV can say whether the market knows better there."""
+    import json
+
+    history()
+    with session_scope() as s:
+        ids = s.execute(text("SELECT pick_id FROM picks ORDER BY pick_id LIMIT 40")).scalars().all()
+        s.execute(
+            text("""UPDATE picks SET side = 'under', context = CAST(:c AS jsonb)
+                    WHERE pick_id = ANY(:i)"""),
+            {"c": json.dumps({"key_out": True}), "i": ids},
+        )
+        s.execute(
+            text("""
+            INSERT INTO odds_snapshots (snapshot_ts, provider, book, game_id, player_id,
+                player_name_raw, market, line_type, line, over_price, under_price, is_close,
+                is_withdrawn)
+            SELECT g.tip_time - interval '10 hours', 'test', 'draftkings', p.game_id,
+                   p.player_id, 'x', p.market, 'main', p.line - 2, -110, -110, false, false
+            FROM picks p JOIN games g USING (game_id) WHERE p.pick_id = ANY(:i)"""),
+            {"i": ids},
+        )
+    with session_scope() as s:
+        rep = review.weekly_review(s, TODAY)
+    sr = rep["season_splits"]
+    assert sr["by_side_role"]["under, key teammate out"]["bets"] == 40
+    assert sr["by_side_role"]["over, untagged"]["bets"] == 310
+    assert sr["by_side_line_move"]["under, line rose 1+"]["bets"] == 40
+    assert "under, key teammate out" in review.render(rep)

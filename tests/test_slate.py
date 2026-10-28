@@ -1,5 +1,6 @@
 """price_slate against Postgres: picks, parlays, reruns, freshness, guards."""
 
+import json
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
@@ -405,3 +406,26 @@ def test_the_shipped_cap_holds_back_the_synthetic_slates_big_edges():
     big = uncapped.picks[uncapped.picks["ev"] > shipped.max_edge]
     assert len(big) and capped.held_back >= len(big)
     assert not len(capped.picks) or (capped.picks["ev"] <= shipped.max_edge).all()
+
+
+@pytest.mark.db
+def test_picks_carry_the_role_context_their_projection_had():
+    """Who was missing from the player's team when the pick was flagged, for the review's
+    'unders on players whose role grew' split."""
+    seed()
+    ctx = {
+        "team_out_min": 34.0,
+        "team_out_usage": 0.27,
+        "starters_out": 1,
+        "same_pos_out_min": 32.0,
+        "key_out": True,
+    }
+    with session_scope() as s:
+        s.execute(
+            text("UPDATE projections SET context = CAST(:c AS jsonb)"), {"c": json.dumps(ctx)}
+        )
+    with session_scope() as s:
+        slate.price_slate(s, DAY, NOW, CFG)
+    with session_scope() as s:
+        got = s.execute(text("SELECT context FROM picks")).scalars().all()
+    assert got and all(c == ctx for c in got)

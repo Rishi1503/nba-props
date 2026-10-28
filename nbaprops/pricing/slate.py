@@ -20,11 +20,11 @@ from decimal import Decimal
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from nbaprops.db.models import Parlay as ParlayRow
-from nbaprops.db.models import ParlayLeg, Pick
+from nbaprops.db.models import ParlayLeg, Pick, Projection
 from nbaprops.models.simulate import line_probs
 from nbaprops.pricing import engine, market, parlays
 
@@ -594,6 +594,14 @@ def _write(session, res: SlateResult, picks: pd.DataFrame, keep: pd.Series, mode
                 kelly=_dec(r.kelly, 4),
                 ev=_dec(r.ev, 4),
                 stake=_dec(r.stake, 2),
+                context=select(Projection.context)
+                .where(
+                    Projection.run_id == res.run_id,
+                    Projection.game_id == r.game_id,
+                    Projection.player_id == int(r.player_id),
+                    Projection.market == r.market,
+                )
+                .scalar_subquery(),
             )
             .on_conflict_do_nothing(constraint="uq_picks_game_player_mode")
             .returning(Pick.pick_id)

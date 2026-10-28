@@ -417,6 +417,11 @@ def project_frame(
         (g, int(p)): t
         for g, p, t in zip(frame["game_id"], frame["player_id"], frame["team_id"], strict=True)
     }
+    from nbaprops.features.context import role_context
+
+    ctx_of = {
+        (r["game_id"], int(r["player_id"])): role_context(r) for r in frame.to_dict("records")
+    }
     cal = bundle.calibrator
     rows = []
     for (game_id, player_id), by_market in draws.items():
@@ -456,6 +461,7 @@ def project_frame(
                     "p_over": _grid(lines, p),
                     "low_confidence": flags[(game_id, player_id)],
                     "scenarios": scen,
+                    "context": ctx_of.get((game_id, int(player_id))),
                 }
             )
     return pd.DataFrame(rows)
@@ -485,7 +491,16 @@ def store_projections(session, run_id: str, projections: pd.DataFrame) -> int:
             index_elements=["run_id", "game_id", "player_id", "market"],
             set_={
                 c: stmt.excluded[c]
-                for c in ("as_of_ts", "mean", "sd", "p_over", "low_confidence", "scenarios")
+                for c in (
+                    "as_of_ts",
+                    "mean",
+                    "sd",
+                    "p_over",
+                    "low_confidence",
+                    "scenarios",
+                    "context",
+                )
+                if c in recs[0]
             },
         )
     )
