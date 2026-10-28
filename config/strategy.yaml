@@ -50,3 +50,15 @@ ramp_factor: 0.5
 candidate_log_min_ev: -0.05
 db_size_limit_mb: 500
 markets: [pts, reb, ast, fg3m, pra]
+# Alt-line parlays, a paper experiment tracked on its own (parlay tier "alt_combo"): 2-3
+# DraftKings "N+" rungs from different games, paying about -125 to +160. Legs only from the
+# stats whose 55-95% probabilities passed the 2024-25 tail check (points and PRA rungs are
+# underrated there); assists shaded down 1.5 points (they ran slightly high). Each leg needs
+# the model at alt_combo_p_min..milestone_p_max and a shaded edge over the EV floor.
+alt_combo_markets: [reb, fg3m, ast]
+alt_combo_shade: {ast: 0.015}
+alt_combo_p_min: 0.65
+alt_combo_decimal_min: 1.8
+alt_combo_decimal_max: 2.6
+alt_combo_max_legs: 3
+max_alt_combos_per_slate: 2

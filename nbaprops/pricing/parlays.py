@@ -178,6 +178,78 @@ def satellites(
     return _best_disjoint(cands, max_n, used)
 
 
+def alt_combo_pool(cands, rules, questionable_ok=None):
+    """Alt-line rungs eligible as alt-combo legs: DraftKings "N+" milestones on
+    rules.alt_combo_markets, the model at alt_combo_p_min..milestone_p_max, the probability
+    shaded per market (rules.alt_combo_shade) and still clearing the EV floor, nothing held
+    back or low-confidence, and teammates of a Questionable player only if `questionable_ok`
+    (engine.questionable_ok) passes. One rung per player: the best shaded EV. Adds p_leg (the
+    shaded probability the combo is priced at) and ev_leg."""
+    import numpy as np
+    import pandas as pd
+
+    if cands is None or not len(cands) or "line_type" not in cands:
+        return pd.DataFrame()
+    c = cands.copy()
+    ok = (
+        (c["line_type"] == "milestone")
+        & (c["side"] == "over")
+        & c["market"].isin(rules.alt_combo_markets)
+        & c["p_model"].astype(float).between(rules.alt_combo_p_min, rules.milestone_p_max)
+        & ~c.get("held_back", pd.Series(False, index=c.index)).fillna(False).astype(bool)
+        & ~c.get("low_confidence", pd.Series(False, index=c.index)).fillna(False).astype(bool)
+    )
+    if questionable_ok is not None:
+        ok &= np.asarray(questionable_ok, dtype=bool)
+    c = c[ok]
+    if c.empty:
+        return c
+    shade = dict(rules.alt_combo_shade)
+    c = c.assign(p_leg=c["p_fair"].astype(float) - c["market"].map(shade).fillna(0.0))
+    c = c.assign(ev_leg=c["p_leg"] * c["decimal"].astype(float) - 1)
+    floor = np.where(c["has_consensus"].astype(bool), rules.ev_min, rules.ev_min_model_only)
+    c = c[(c["ev_leg"] >= floor) & (c["ev"].astype(float) <= rules.max_edge)]
+    return (
+        c.sort_values("ev_leg", ascending=False).drop_duplicates(["game_id", "player_id"]).head(25)
+    )
+
+
+def alt_combos(pool, rules, bankroll: float, max_n: int) -> list[Parlay]:
+    """2..alt_combo_max_legs rungs from different games, paying alt_combo_decimal_min..max,
+    EV >= ev_min at the shaded probabilities, quarter Kelly capped at max_parlay_pct; the
+    highest total growth over at most `max_n` with no shared legs. Leg pick_ref is the row's
+    position in `pool` (the caller maps it to a pick row)."""
+    if max_n <= 0 or pool is None or len(pool) < 2:
+        return []
+    legs = [
+        Leg(
+            i,
+            r.game_id,
+            int(r.player_id),
+            r.market,
+            float(r.line),
+            "over",
+            float(r.decimal),
+            float(r.p_leg),
+        )
+        for i, r in enumerate(pool.itertuples(index=False))
+    ]
+    cands = []
+    for n in range(2, rules.alt_combo_max_legs + 1):
+        for combo in combinations(legs, n):
+            if len({lg.game_id for lg in combo}) < n:
+                continue  # different games: independent legs, priced by multiplication
+            dec = float(np.prod([lg.decimal for lg in combo]))
+            if not rules.alt_combo_decimal_min <= dec <= rules.alt_combo_decimal_max:
+                continue
+            ev, p_all, p_lose = payout_ev(combo)
+            if ev < rules.ev_min:
+                continue
+            p = Parlay("alt_combo", combo, dec, p_all, p_lose, ev)
+            cands.append(_finish(p, rules.kelly_fraction, rules.max_parlay_pct, bankroll))
+    return _best_disjoint(cands, max_n, set())
+
+
 def boost_parlay(
     legs: list[Leg],
     boost: float,

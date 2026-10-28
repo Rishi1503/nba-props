@@ -217,6 +217,74 @@ def committed_today(session, game_date: date, mode: str) -> tuple[pd.DataFrame, 
     return singles, float(par["stake"].astype(float).sum()), int((par["tier"] == "satellite").sum())
 
 
+def alt_combos_today(session, game_date: date, mode: str) -> int:
+    return int(
+        session.execute(
+            text("""SELECT count(*) FROM parlays
+                    WHERE slate_date = :d AND mode = :m AND tier = 'alt_combo'"""),
+            {"d": game_date, "m": mode},
+        ).scalar()
+        or 0
+    )
+
+
+def _alt_combo_parlays(cands, picks, singles_done, rules, bankroll: float, max_n: int):
+    """(picks, alt-combo parlays). Each leg needs a pick row (one per player per game): this
+    run's row for the identical prop backs it, otherwise a zero-stake leg-only row is added
+    (tier boost_leg, kept out of the singles' statistics); players with any other pick today
+    are skipped."""
+    from dataclasses import replace
+
+    own = {}
+    for i, r in enumerate(picks.itertuples(index=False)) if len(picks) else []:
+        own[(r.game_id, int(r.player_id), r.market, float(r.line), r.side)] = i
+    busy = {
+        (g, int(p)) for g, p in zip(singles_done["game_id"], singles_done["player_id"], strict=True)
+    } | {(k[0], k[1]) for k in own}
+    q_ok = engine.questionable_ok(cands, rules) if "ev_if_plays" in cands else None
+    pool = parlays.alt_combo_pool(cands, rules, q_ok)
+    if len(pool):
+        keys = list(
+            zip(
+                pool["game_id"],
+                pool["player_id"].astype(int),
+                pool["market"],
+                pool["line"].astype(float),
+                pool["side"],
+                strict=True,
+            )
+        )
+        pool = pool[[k in own or (k[0], k[1]) not in busy for k in keys]].reset_index(drop=True)
+    ref_of: dict[int, int] = {}
+    out = []
+    for par in parlays.alt_combos(pool, rules, bankroll, max_n):
+        legs = []
+        for lg in par.legs:
+            if lg.pick_ref not in ref_of:
+                row = pool.iloc[lg.pick_ref]
+                k = (
+                    row["game_id"],
+                    int(row["player_id"]),
+                    row["market"],
+                    float(row["line"]),
+                    row["side"],
+                )
+                if k in own:
+                    ref_of[lg.pick_ref] = own[k]
+                else:
+                    extra = (
+                        row.drop(labels=["p_leg", "ev_leg"])
+                        .to_frame()
+                        .T.assign(stake=0.0, tracked_only=True, tier_override="boost_leg")
+                    )
+                    picks = pd.concat([picks, extra], ignore_index=True)
+                    ref_of[lg.pick_ref] = len(picks) - 1
+            legs.append(replace(lg, pick_ref=ref_of[lg.pick_ref]))
+        par.legs = tuple(legs)
+        out.append(par)
+    return picks, out
+
+
 # --- pricing ---------------------------------------------------------------------------
 
 
@@ -422,6 +490,14 @@ def price_slate(
         picks["stake"] = (picks["stake"] * scale).round(2)
     for p in built:
         p.stake = round(p.stake * scale, 2)
+    # Alt-line parlays: a separate paper experiment, sized on their own (outside the daily cap
+    # above, so they never shrink the singles) and reviewed under their own tier.
+    alt_left = rules.max_alt_combos_per_slate - alt_combos_today(session, game_date, mode)
+    if alt_left > 0:
+        picks, alt = _alt_combo_parlays(cands, picks, singles_done, rules, res.bankroll, alt_left)
+        for p in alt:
+            p.stake = round(p.stake, 2)
+        built += alt
     keep = (
         ((picks["stake"] >= MIN_STAKE) | picks["tracked_only"])
         if len(picks)

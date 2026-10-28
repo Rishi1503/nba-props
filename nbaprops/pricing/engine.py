@@ -57,10 +57,22 @@ class Rules:
     sgp_ev_haircut: float = 0.03
     stake_standard_flags: bool = True  # config default is False (high-confidence singles)
     questionable_teammates: str = "robust"  # robust | mixture | block (see strategy.yaml)
+    alt_combo_markets: tuple = ("reb", "fg3m", "ast")
+    alt_combo_shade: tuple = (("ast", 0.015),)  # (market, probability shaved off) pairs
+    alt_combo_p_min: float = 0.65
+    alt_combo_decimal_min: float = 1.8
+    alt_combo_decimal_max: float = 2.6
+    alt_combo_max_legs: int = 3
+    max_alt_combos_per_slate: int = 2
 
     @classmethod
     def from_config(cls, cfg) -> "Rules":
-        return cls(**{k: getattr(cfg, k) for k in cls.__dataclass_fields__})
+        vals = {k: getattr(cfg, k) for k in cls.__dataclass_fields__ if hasattr(cfg, k)}
+        if "alt_combo_markets" in vals:
+            vals["alt_combo_markets"] = tuple(vals["alt_combo_markets"])
+        if "alt_combo_shade" in vals:
+            vals["alt_combo_shade"] = tuple(sorted(dict(vals["alt_combo_shade"]).items()))
+        return cls(**vals)
 
 
 def candidates(

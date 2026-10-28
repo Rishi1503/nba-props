@@ -294,6 +294,18 @@ def render(rep: dict) -> str:
     for key in ("under, line rose 1+", "under, line steady"):
         if key in sr.get("by_side_line_move", {}):
             out.append("  " + line(key, sr["by_side_line_move"][key]))
+    names = {
+        "satellite": "Parlays (from singles)",
+        "boost": "Boosts",
+        "alt_combo": "Alt-line parlays (experiment)",
+    }
+    for tier, p in rep.get("parlays", {}).items():
+        hit = "n/a" if p.get("hit_rate") is None else f"{p['hit_rate']:.1%}"
+        roi = "n/a" if p.get("roi") is None else f"{p['roi']:+.1%}"
+        out.append(
+            f"{names.get(tier, tier)}: {p['parlays']} settled, hit {hit}, "
+            f"ROI {roi}, average predicted edge {p['avg_ev']:+.1%}"
+        )
     if rep["market_rule"]:
         out.append(
             "Switched off (CLV negative after 100+ picks): "

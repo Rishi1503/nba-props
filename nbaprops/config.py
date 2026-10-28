@@ -39,6 +39,15 @@ class StrategyConfig(BaseModel):
     candidate_log_min_ev: float = Field(le=0)
     db_size_limit_mb: int = Field(gt=0)
     markets: list[Market]
+    # Alt-line parlays (a paper experiment): 2-3 DraftKings "N+" rungs from different games
+    # near +100, on the stats whose 55-95% probabilities passed the 2024-25 tail check.
+    alt_combo_markets: list[Market] = ["reb", "fg3m", "ast"]
+    alt_combo_shade: dict[Market, float] = {"ast": 0.015}  # assists ran ~1.5 points high
+    alt_combo_p_min: float = Field(0.65, ge=0.0, le=1.0)
+    alt_combo_decimal_min: float = Field(1.8, gt=1.0)
+    alt_combo_decimal_max: float = Field(2.6, gt=1.0)
+    alt_combo_max_legs: int = Field(3, ge=2, le=4)
+    max_alt_combos_per_slate: int = Field(2, ge=0)
 
     @model_validator(mode="after")
     def _caps_are_ordered(self) -> "StrategyConfig":
@@ -50,6 +59,8 @@ class StrategyConfig(BaseModel):
             raise ValueError("max_edge must be above the EV floors")
         if not self.milestone_p_min < self.milestone_p_max:
             raise ValueError("milestone_p_min must be below milestone_p_max")
+        if not self.alt_combo_decimal_min < self.alt_combo_decimal_max:
+            raise ValueError("alt_combo_decimal_min must be below alt_combo_decimal_max")
         return self
 
 
