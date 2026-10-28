@@ -173,11 +173,29 @@ def holdout_verdict(
 
 
 def model_inputs(without: str | None) -> list[str] | None:
-    """Every input, or every input except one group (`--without roster`)."""
+    """Every input, or every input except some groups (`--without roster` or, comma-separated,
+    `--without roster_no_wo,other`)."""
     if not without:
         return None
-    drop = set(FEATURE_GROUPS[without])
+    drop = {c for g in without.split(",") for c in FEATURE_GROUPS[g.strip()]}
     return [c for c in FEATURE_COLUMNS if c not in drop]
+
+
+def ablation_inputs(evaluated: list[str] | None, group: str) -> list[str]:
+    """The comparison run of `--ablate GROUP`: the inputs this run evaluated minus GROUP, so
+    groups excluded with --without stay excluded (champion + GROUP vs the champion)."""
+    drop = set(FEATURE_GROUPS[group])
+    return [c for c in (evaluated or FEATURE_COLUMNS) if c not in drop]
+
+
+def _groups(value: str) -> str:
+    names = [g.strip() for g in value.split(",") if g.strip()]
+    bad = [g for g in names if g not in FEATURE_GROUPS]
+    if not names or bad:
+        raise argparse.ArgumentTypeError(
+            f"unknown input group(s) {bad or value!r}; choose from {sorted(FEATURE_GROUPS)}"
+        )
+    return ",".join(names)
 
 
 def save_production(
@@ -344,10 +362,11 @@ def render_markdown(report: dict) -> str:
                     "",
                 ]
     if report.get("ablation"):
+        group = report.get("settings", {}).get("ablate") or "roster"
         lines += [
-            "## With vs without the roster inputs",
+            f"## With vs without the {group} inputs",
             "",
-            "Negative differences favor the model WITH roster inputs.",
+            f"Negative differences favor the model WITH the {group} inputs.",
             "",
             "| Market | Log loss diff | z | MAE diff | z |",
             "|---|---|---|---|---|",
@@ -432,8 +451,8 @@ def main(argv: list[str] | None = None) -> dict:
     )
     ap.add_argument(
         "--without",
-        choices=sorted(FEATURE_GROUPS),
-        help="evaluate (and build production) without one group of inputs",
+        type=_groups,
+        help="evaluate (and build production) without these input groups (comma-separated)",
     )
     ap.add_argument(
         "--accept-rerun",
@@ -494,6 +513,7 @@ def main(argv: list[str] | None = None) -> dict:
             "n_sims": args.n_sims,
             "first_train_season": args.first_train_season,
             "without": args.without,
+            "ablate": args.ablate,
         },
         "holdout": ("clean" if clean else f"NOT CLEAN (rerun: {args.rerun_holdout})")
         if args.season == HOLDOUT_SEASON
@@ -514,11 +534,10 @@ def main(argv: list[str] | None = None) -> dict:
     if args.tails:
         report["tails"] = tails.tail_report(tails.favored_points(target.grids, target.rows))
     if args.ablate:
-        drop = set(FEATURE_GROUPS[args.ablate])
         without = wf.Settings(
             **{
                 **settings.__dict__,
-                "features": [c for c in FEATURE_COLUMNS if c not in drop],
+                "features": ablation_inputs(settings.features, args.ablate),
                 "label": f"{run_id}-no-{args.ablate}",
             }
         )

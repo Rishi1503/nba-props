@@ -564,3 +564,24 @@ def test_command_line_tail_calibration(frame, tmp_path):
     assert "Tail calibration" in md
     assert "Teammate absences: projection bias" in md  # the diagnostic is in every report
     assert rep["layer_a"]["absence_bias"]["pts"]
+
+
+def test_input_groups_for_the_with_without_experiment():
+    """Champion inputs plus the with/without splits, compared with the champion's inputs: the
+    ablation's comparison run must keep the other roster inputs excluded."""
+    import argparse
+
+    from nbaprops.features.build import FEATURE_COLUMNS, FEATURE_GROUPS
+
+    wo, rest = set(FEATURE_GROUPS["with_without"]), set(FEATURE_GROUPS["roster_no_wo"])
+    assert wo and rest and not wo & rest and wo | rest == set(FEATURE_GROUPS["roster"])
+    evaluated = bt.model_inputs("roster_no_wo")
+    assert wo <= set(evaluated) and not rest & set(evaluated)
+    champion = bt.model_inputs("roster")
+    assert bt.ablation_inputs(evaluated, "with_without") == champion  # not every input
+    assert bt.ablation_inputs(None, "roster") == champion
+    both = bt.model_inputs("roster_no_wo, with_without")
+    assert both == champion and len(both) < len(FEATURE_COLUMNS)
+    with pytest.raises(argparse.ArgumentTypeError):
+        bt._groups("roster,nope")
+    assert bt._groups(" roster , with_without ") == "roster,with_without"

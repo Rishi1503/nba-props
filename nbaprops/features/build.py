@@ -1549,4 +1549,10 @@ FEATURE_GROUPS = {
         if c.startswith(("stint_", "departed_", "arrived_", "returning_", "wo_", "opp_absent_"))
         or c == "opp_same_pos_absent_min"
     ],
+    # this player's production with vs without today's most important absent teammate
+    "with_without": [c for c in FEATURE_COLUMNS if c.startswith("wo_")],
 }
+# the roster group minus the with/without splits, to test those on their own
+FEATURE_GROUPS["roster_no_wo"] = [
+    c for c in FEATURE_GROUPS["roster"] if c not in FEATURE_GROUPS["with_without"]
+]
