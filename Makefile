@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-tails backtest-wo backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout holdout-rerun unvoid bankroll review golive tune recalibrate api web demo e2e
+.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-tails backtest-wo backtest-rungs backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout holdout-rerun unvoid bankroll review golive tune recalibrate api web demo e2e
 
 setup:
 	uv sync --all-extras --locked
@@ -74,6 +74,11 @@ backtest-tune:
 # for the production configuration (no roster inputs)
 backtest-tails:
 	uv run python -m nbaprops.backtest.run --season 2024-25 --without roster --tails
+
+# The alt-rung correction for points and PRA: fit on 2024-25's first half, checked on its
+# second half; config/rung_calibration.json is written only if the check passes
+backtest-rungs:
+	uv run python -m nbaprops.backtest.run --season 2024-25 --without roster --tails --fit-rungs config/rung_calibration.json
 
 # The with/without splits on their own: the champion's inputs plus them, vs the champion's
 backtest-wo:

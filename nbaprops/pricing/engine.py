@@ -64,10 +64,13 @@ class Rules:
     alt_combo_decimal_max: float = 2.6
     alt_combo_max_legs: int = 3
     max_alt_combos_per_slate: int = 2
+    # (market, xs, ys) curves correcting favored-over probabilities of alt rungs only
+    rung_curves: tuple = ()
 
     @classmethod
     def from_config(cls, cfg) -> "Rules":
         vals = {k: getattr(cfg, k) for k in cls.__dataclass_fields__ if hasattr(cfg, k)}
+        vals["rung_curves"] = load_rung_curves(getattr(cfg, "rung_calibration", None))
         if "alt_combo_markets" in vals:
             vals["alt_combo_markets"] = tuple(vals["alt_combo_markets"])
         if "alt_combo_shade" in vals:
@@ -276,6 +279,33 @@ def shifted_tail(
     return float(np.interp(x, xs, ps))
 
 
+def load_rung_curves(path) -> tuple:
+    """The alt-rung correction written by `make backtest-rungs`, or () without one."""
+    import json
+    from pathlib import Path
+
+    if not path:
+        return ()
+    p = Path(path)
+    if not p.is_absolute():
+        p = Path(__file__).resolve().parents[2] / p
+    if not p.exists():
+        return ()
+    curves = json.loads(p.read_text()).get("curves", {})
+    return tuple(
+        (m, tuple(float(v) for v in xy[0]), tuple(float(v) for v in xy[1]))
+        for m, xy in sorted(curves.items())
+    )
+
+
+def _rung_fix(curves: dict, market: str, p: float) -> float:
+    """Favored-over probability of an alt rung, corrected for `market` when a curve exists."""
+    if market not in curves or not np.isfinite(p) or p < 0.5:
+        return p
+    xs, ys = curves[market]
+    return float(np.interp(p, xs, ys))
+
+
 def milestone_candidates(grids: pd.DataFrame, board: pd.DataFrame, rules: Rules) -> pd.DataFrame:
     """One-sided DraftKings milestones ("20+" stored as 19.5). `grids`: game_id, player_id,
     market, p_over (the stored half-point grid), low_confidence (+ passthrough columns).
@@ -296,6 +326,7 @@ def milestone_candidates(grids: pd.DataFrame, board: pd.DataFrame, rules: Rules)
     gl = grids.drop_duplicates(["game_id", "player_id", "market"], keep="last").set_index(
         ["game_id", "player_id", "market"]
     )
+    curves = {m: (xs, ys) for m, xs, ys in rules.rung_curves}
     rows = []
     for q in ms.itertuples(index=False):
         k = (q.game_id, q.player_id, q.market)
@@ -310,10 +341,15 @@ def milestone_candidates(grids: pd.DataFrame, board: pd.DataFrame, rules: Rules)
         if np.isnan(p_model) or np.isnan(shifted_tail(grid, q.line, shift=shift)):
             continue
 
-        def fair_from(g: dict, anchor=anchor, shift=shift, d=d, line=q.line) -> float:
+        def fair_from(
+            g: dict, anchor=anchor, shift=shift, d=d, line=q.line, market=q.market
+        ) -> float:
             if anchor:
-                return shifted_tail(g, line, shift=shift)
-            return shrink_toward(shifted_tail(g, line), 1 / d, rules.model_only_shrink)
+                return _rung_fix(curves, market, shifted_tail(g, line, shift=shift))
+            fixed = _rung_fix(curves, market, shifted_tail(g, line))
+            return shrink_toward(fixed, 1 / d, rules.model_only_shrink)
+
+        p_model = _rung_fix(curves, q.market, p_model)
 
         p_fair = fair_from(grid)
         thr = rules.ev_min if anchor else rules.ev_min_model_only
@@ -324,7 +360,11 @@ def milestone_candidates(grids: pd.DataFrame, board: pd.DataFrame, rules: Rules)
             f_in, f_out = fair_from(sc["in"]), fair_from(sc["out"])
             ev_in, ev_out = f_in * (d - 1) - (1 - f_in), f_out * (d - 1) - (1 - f_out)
         low = bool(info.get("low_confidence", False))
-        in_band = rules.milestone_p_min <= p_model <= rules.milestone_p_max
+        # inside the validated band: the model's probability and the one the bet is priced at
+        in_band = (
+            rules.milestone_p_min <= p_model <= rules.milestone_p_max
+            and rules.milestone_p_min <= p_fair <= rules.milestone_p_max
+        )
         held = ev >= thr and not low and in_band and ev > rules.max_edge
         flag = ev >= thr and not low and in_band and not held
         rows.append(

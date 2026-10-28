@@ -553,7 +553,15 @@ def test_command_line_tail_calibration(frame, tmp_path):
             "--tails",
             "--without",
             "roster",
+            "--fit-rungs",
+            str(tmp_path / "rungs.json"),
         ]
+    )
+    rc = rep["rung_check"]  # the alt-rung correction is written only if its check passes
+    assert (tmp_path / "rungs.json").exists() == rc["passes"]
+    assert (
+        "Alt-rung correction"
+        in (tmp_path / "reports" / "backtest" / f"{rep['run_id']}.md").read_text()
     )
     t = rep["tails"]
     scored = [b for bands in t["bands"].values() for b in bands]

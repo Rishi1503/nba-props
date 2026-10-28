@@ -642,3 +642,20 @@ def test_the_board_says_how_many_props_were_held_back():
 
     res = SlateResult(date(2026, 10, 26), datetime(2026, 10, 26, 20, 0), "r", held_back=3)
     assert "3 props held back" in prun.render(res)
+
+
+def test_points_rungs_use_the_alt_rung_correction_and_the_band_checks_the_priced_chance():
+    from dataclasses import replace
+
+    base = engine.milestone_candidates(_grids(), _ms_board(), RULES).iloc[0]
+    up = replace(RULES, rung_curves=(("pts", (0.5, 0.7, 1.0), (0.5, 0.8, 1.0)),))
+    fixed = engine.milestone_candidates(_grids(), _ms_board(), up).iloc[0]
+    assert base["p_fair"] >= 0.52  # a favored over, so the correction applies
+    assert fixed["p_fair"] > base["p_fair"]  # favored overs: the model ran low
+    # a correction pushing the priced chance past the band's top: not flagged
+    far = replace(RULES, rung_curves=(("pts", (0.5, 0.51, 1.0), (0.5, 0.99, 1.0)),))
+    c = engine.milestone_candidates(_grids(), _ms_board(), far).iloc[0]
+    assert c["p_fair"] > RULES.milestone_p_max and not c["flag"]
+    other = replace(RULES, rung_curves=(("reb", (0.5, 0.7, 1.0), (0.5, 0.8, 1.0)),))
+    same = engine.milestone_candidates(_grids(), _ms_board(), other).iloc[0]
+    assert same["p_fair"] == pytest.approx(base["p_fair"])  # no curve for points: unchanged

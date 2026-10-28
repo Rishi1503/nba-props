@@ -48,6 +48,9 @@ class StrategyConfig(BaseModel):
     alt_combo_decimal_max: float = Field(2.6, gt=1.0)
     alt_combo_max_legs: int = Field(3, ge=2, le=4)
     max_alt_combos_per_slate: int = Field(2, ge=0)
+    # alt-rung correction for points/PRA favored overs (make backtest-rungs writes it only
+    # when its out-of-sample check passes); relative paths are from the repository root
+    rung_calibration: str | None = "config/rung_calibration.json"
 
     @model_validator(mode="after")
     def _caps_are_ordered(self) -> "StrategyConfig":

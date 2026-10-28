@@ -4,6 +4,7 @@ away from 50% (an overconfident model)."""
 
 import numpy as np
 import pandas as pd
+import pytest
 from scipy.stats import poisson
 
 from nbaprops.backtest import tails
@@ -160,3 +161,62 @@ def test_absence_bias_has_the_key_teammate_out_slices():
     b = {x["bucket"]: x for x in metrics.absence_bias(rows)["pts"]}
     assert b["key teammate out, same position"]["bias_pct"] > 0.09
     assert {"key teammate out, starters", "key teammate out, bench"} <= set(b)
+
+
+# --- alt-rung correction (points/PRA favored overs) ----------------------------------------
+
+
+def _underrated_overs(n=60000, gap=0.08, seed=4):
+    """Favored overs that hit `gap` more often than the model says, across a season."""
+    rng = np.random.default_rng(seed)
+    q = rng.uniform(0.55, 0.95, n)
+    truth = np.clip(q + gap * (1 - (q - 0.55) / 0.4), 0, 1)  # the gap closes toward 95%
+    dates = pd.to_datetime("2024-10-22") + pd.to_timedelta(rng.integers(0, 170, n), unit="D")
+    return pd.DataFrame(
+        {
+            "market": rng.choice(["pts", "pra"], n),
+            "player_id": rng.integers(0, 500, n),
+            "game_date": dates,
+            "side": "over",
+            "line": 10.5,
+            "q": q,
+            "hit": (rng.random(n) < truth).astype(float),
+        }
+    )
+
+
+def test_the_rung_curve_learns_the_underrating_and_passes_out_of_sample():
+    from nbaprops.backtest import tails
+
+    pts = _underrated_overs()
+    curve = tails.fit_rung_curve(pts, "pts")
+    assert tails.apply_rung_curve(curve, [0.60])[0] == pytest.approx(0.67, abs=0.025)
+    assert tails.apply_rung_curve(curve, [0.40])[0] == 0.40  # unders' side untouched
+    before = tails.tail_report(pts[pts["market"] == "pts"])
+    assert not before["passes"]  # the problem as the 2024-25 check found it
+    check = tails.rung_check(pts)
+    assert check["passes"] and set(check["curves"]) == {"pts", "pra"}
+    md = "\n".join(tails.render_rung_check(check))
+    assert "PASS" in md and "failing bands" in md
+
+
+def test_the_rung_check_fails_without_enough_data():
+    from nbaprops.backtest import tails
+
+    check = tails.rung_check(_underrated_overs(n=500))
+    assert not check["passes"]
+
+
+def test_rung_curves_load_from_the_file_or_not_at_all(tmp_path):
+    import json
+    from types import SimpleNamespace
+
+    from nbaprops.pricing import engine
+
+    f = tmp_path / "rungs.json"
+    f.write_text(json.dumps({"curves": {"pts": [[0.5, 0.7, 1.0], [0.5, 0.78, 1.0]]}}))
+    assert engine.load_rung_curves(f) == (("pts", (0.5, 0.7, 1.0), (0.5, 0.78, 1.0)),)
+    assert engine.load_rung_curves(tmp_path / "missing.json") == ()
+    assert engine.load_rung_curves(None) == ()
+    rules = engine.Rules.from_config(SimpleNamespace(rung_calibration=str(f)))
+    assert rules.rung_curves and rules.rung_curves[0][0] == "pts"

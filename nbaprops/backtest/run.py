@@ -384,6 +384,8 @@ def render_markdown(report: dict) -> str:
     ]
     if "tails" in report:
         lines += tails.render(report["tails"])
+    if report.get("rung_check"):
+        lines += tails.render_rung_check(report["rung_check"])
     return "\n".join(lines) + "\n"
 
 
@@ -450,6 +452,13 @@ def main(argv: list[str] | None = None) -> dict:
         help="also check calibration from 55% to 95% on every grid line",
     )
     ap.add_argument(
+        "--fit-rungs",
+        type=Path,
+        metavar="PATH",
+        help="with --tails: fit the alt-rung correction, check it on the season's second half, "
+        "and write it to PATH only if the check passes",
+    )
+    ap.add_argument(
         "--without",
         type=_groups,
         help="evaluate (and build production) without these input groups (comma-separated)",
@@ -495,6 +504,8 @@ def main(argv: list[str] | None = None) -> dict:
                 .drop_duplicates()
                 .reset_index(drop=True)
             )
+    if args.fit_rungs and not args.tails:
+        ap.error("--fit-rungs needs --tails")
     if args.tails:  # a calibrated grid for every player-game of the season
         season_rows = df.loc[df["season"] == args.season, ["game_id", "player_id"]]
         keys = season_rows.merge(pd.DataFrame({"market": simulate.MARKETS}), how="cross")
@@ -532,7 +543,27 @@ def main(argv: list[str] | None = None) -> dict:
             target.priced, *market, rules, args.flag_at, target.grids
         )
     if args.tails:
-        report["tails"] = tails.tail_report(tails.favored_points(target.grids, target.rows))
+        points = tails.favored_points(target.grids, target.rows)
+        report["tails"] = tails.tail_report(points)
+        if args.fit_rungs:
+            check = tails.rung_check(points)
+            report["rung_check"] = {k: v for k, v in check.items() if k != "curves"}
+            if check["passes"]:
+                args.fit_rungs.parent.mkdir(parents=True, exist_ok=True)
+                args.fit_rungs.write_text(
+                    json.dumps(
+                        {
+                            "kind": "rung_calibration",
+                            "fitted_on": run_id,
+                            "season": args.season,
+                            "without": args.without,
+                            "split_date": check["split_date"],
+                            "curves": check["curves"],
+                        },
+                        indent=1,
+                    )
+                )
+                report["rung_check"]["written"] = str(args.fit_rungs)
     if args.ablate:
         without = wf.Settings(
             **{
