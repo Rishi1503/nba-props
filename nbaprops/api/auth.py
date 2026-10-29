@@ -104,5 +104,6 @@ if __name__ == "__main__":
         raise SystemExit("Use at least 12 characters.")
     if pw != getpass.getpass("Again: "):
         raise SystemExit("They didn't match.")
-    print("DASHBOARD_PASSWORD_HASH=" + hash_password(pw))
-    print("DASHBOARD_SECRET=" + secrets.token_urlsafe(48))
+    # single-quoted: the hash contains "$", which a shell sourcing .env would expand
+    print(f"DASHBOARD_PASSWORD_HASH='{hash_password(pw)}'")
+    print(f"DASHBOARD_SECRET='{secrets.token_urlsafe(48)}'")

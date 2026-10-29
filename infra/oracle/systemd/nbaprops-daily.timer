@@ -1,0 +1,10 @@
+[Unit]
+Description=nba-props morning routine at 9:05 AM New York
+
+[Timer]
+OnCalendar=*-*-* 09:05:00 America/New_York
+Unit=nbaprops@daily.service
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

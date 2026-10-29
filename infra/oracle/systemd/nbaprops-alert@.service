@@ -1,0 +1,8 @@
+[Unit]
+Description=nba-props: alert that %i failed
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@REPO@
+ExecStart=/bin/bash @REPO@/infra/oracle/run.sh alert "the %i job failed; see: journalctl -u nbaprops@%i -n 80"

@@ -1,0 +1,15 @@
+[Unit]
+Description=nba-props dashboard API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+WorkingDirectory=@REPO@
+EnvironmentFile=@REPO@/.env
+ExecStart=@HOME@/.local/bin/uv run --extra api uvicorn nbaprops.api.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

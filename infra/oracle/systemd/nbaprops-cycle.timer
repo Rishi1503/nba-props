@@ -1,0 +1,12 @@
+[Unit]
+Description=nba-props cycles: pricing at 10 AM and 3 PM, afternoon :20/:50, every 15 min evenings (New York)
+
+[Timer]
+OnCalendar=*-*-* 10,15:00:00 America/New_York
+OnCalendar=*-*-* 11..16:20,50:00 America/New_York
+OnCalendar=*-*-* 17..23:00/15:00 America/New_York
+Unit=nbaprops@cycle.service
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

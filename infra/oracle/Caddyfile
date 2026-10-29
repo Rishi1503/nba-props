@@ -1,0 +1,12 @@
+# The dashboard on the server itself only; Tailscale serves it over HTTPS to your devices.
+:8080 {
+	bind 127.0.0.1
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle {
+		root * /srv/nbaprops-web
+		try_files {path} /index.html
+		file_server
+	}
+}

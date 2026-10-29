@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-tails backtest-wo backtest-rungs backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout holdout-rerun unvoid bankroll review golive tune recalibrate api web demo e2e
+.PHONY: setup db-up db-down migrate test lint fmt seed schedule snapshot injuries tick backfill stats-day features minutes stage5-eval stage5-train slate backtest-tune backtest-tails backtest-wo backtest-rungs backtest-holdout backtest-layer-b price cycle settle retrain status import-champion production-from-holdout holdout-rerun unvoid bankroll review golive tune recalibrate api web demo e2e site site-deploy
 
 setup:
 	uv sync --all-extras --locked
@@ -157,3 +157,10 @@ demo:
 # Browser smoke test of every page (disposable database!): E2E_DATABASE_URL=... make e2e
 e2e:
 	cd web && npx ng build && cd .. && uv run python web/e2e/smoke.py
+
+# The bankroll page: build and open it here, or publish it to Cloudflare Pages
+site:
+	uv run python -m nbaprops.site.build --out site/dist && open site/dist/index.html
+
+site-deploy:
+	FORCE=1 bash infra/pages/publish.sh

@@ -1,0 +1,9 @@
+[Unit]
+Description=nba-props: apply new commits from GitHub every 10 minutes
+
+[Timer]
+OnCalendar=*:0/10
+Unit=nbaprops@deploy.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=nba-props %i
+After=network-online.target
+Wants=network-online.target
+OnFailure=nbaprops-alert@%i.service
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@REPO@
+ExecStart=/bin/bash @REPO@/infra/oracle/run.sh %i
+TimeoutStartSec=40min

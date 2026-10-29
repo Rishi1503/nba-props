@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>NBA props paper bankroll</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏀</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F3F6F8; --surface: #FFFFFF; --ink: #14263A; --muted: #5A6B7C; --rule: #D6DFE7;
+    --court: #2C5AA0; --win: #1C7A51; --loss: #B3372F;
+    --win-fill: rgba(28, 122, 81, .15); --loss-fill: rgba(179, 55, 47, .15);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0E1A26; --surface: #142333; --ink: #E3EBF2; --muted: #93A4B5; --rule: #243A4E;
+      --court: #82A8E2; --win: #52C690; --loss: #F2827A;
+      --win-fill: rgba(82, 198, 144, .17); --loss-fill: rgba(242, 130, 122, .17);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 16px/1.5 Barlow, "Helvetica Neue", Arial, sans-serif;
+    padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0)
+             env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 28px 18px 56px; }
+  .cond { font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif; font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .win { color: var(--win); } .loss { color: var(--loss); }
+
+  .kicker { margin: 0; color: var(--muted); font-size: 15px; }
+  .big { margin: 2px 0 0; font: 700 clamp(56px, 17vw, 76px)/1 "Barlow Condensed", "Arial Narrow", sans-serif; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+  .delta { margin: 6px 0 0; font: 600 20px/1.2 "Barlow Condensed", "Arial Narrow", sans-serif; font-variant-numeric: tabular-nums; }
+
+  .flow { margin: 18px -4px 0; }
+  .flow svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .flow .axis { font: 500 12px Barlow, Arial, sans-serif; fill: var(--muted); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+
+  .line { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 16px 0 0; padding: 12px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .line div { display: flex; flex-direction: column; }
+  .line b { font: 600 22px/1.1 "Barlow Condensed", "Arial Narrow", sans-serif; font-variant-numeric: tabular-nums; }
+  .line span { font-size: 14px; color: var(--muted); }
+
+  h2 { margin: 34px 0 6px; font: 600 26px/1.1 "Barlow Condensed", "Arial Narrow", sans-serif; }
+  .note { margin: 0 0 8px; color: var(--muted); font-size: 15px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .row .who { font-weight: 600; }
+  .row .what { color: var(--muted); font-size: 15px; grid-column: 1; }
+  .row .amt { grid-row: 1 / span 2; grid-column: 2; align-self: center; text-align: right; font: 600 18px/1.2 "Barlow Condensed", "Arial Narrow", sans-serif; font-variant-numeric: tabular-nums; }
+  .row .amt small { display: block; font: 400 13px Barlow, Arial, sans-serif; color: var(--muted); }
+  .parlay { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .parlay .head { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; }
+  .parlay ul { margin: 4px 0 0; padding: 0 0 0 18px; color: var(--muted); font-size: 15px; }
+
+  details { border-bottom: 1px solid var(--rule); }
+  summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto auto; gap: 16px; align-items: baseline; padding: 12px 2px; }
+  summary::-webkit-details-marker { display: none; }
+  summary .d { font-weight: 600; }
+  summary .rec { color: var(--muted); }
+  summary .p { font: 600 19px/1 "Barlow Condensed", "Arial Narrow", sans-serif; font-variant-numeric: tabular-nums; min-width: 76px; text-align: right; }
+  summary:focus-visible, a:focus-visible { outline: 2px solid var(--court); outline-offset: 2px; border-radius: 4px; }
+  details[open] summary { border-bottom: 1px dashed var(--rule); }
+  details .inner { padding: 0 2px 6px; }
+  details .row:last-child, details .parlay:last-child { border-bottom: 0; }
+
+  .verdict { margin: 0; padding: 14px 16px; background: var(--surface); border-left: 4px solid var(--court); border-radius: 0 6px 6px 0; }
+  .verdict.stop { border-left-color: var(--loss); }
+  .verdict b { font: 600 20px/1.2 "Barlow Condensed", "Arial Narrow", sans-serif; display: block; }
+  footer { margin-top: 36px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const DATA = /*__DATA__*/null;
+
+const MARKET = { pts: "points", reb: "rebounds", ast: "assists", fg3m: "threes", pra: "PRA" };
+const TIER = { satellite: "Parlays from singles", alt_combo: "Alt-line parlays", boost: "Boosts" };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (x, signed = false) => {
+  const v = Number(x || 0), s = Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (signed ? (v > 0 ? "+" : v < 0 ? "−" : "") : v < 0 ? "−" : "") + "$" + s;
+};
+const pct = (x) => x == null ? "–" : (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x * 100).toFixed(1) + "%";
+const price = (p) => (p > 0 ? "+" : "−") + Math.abs(p);
+const tone = (v) => (v > 0 ? "win" : v < 0 ? "loss" : "muted");
+const day = (iso, opts = { weekday: "short", month: "short", day: "numeric" }) =>
+  new Date(iso + "T12:00:00").toLocaleDateString("en-US", opts);
+const bet = (p) => `${MARKET[p.market] || p.market} ${p.side} ${Number(p.line)}`;
+const outcome = (p) => p.result === "win" ? "Won" : p.result === "loss" ? "Lost" : p.result === "push" ? "Push" : p.result === "void" ? "Void" : null;
+
+function flowChart(curve, start) {
+  if (curve.length < 2) return `<p class="note">The chart starts once the first bets settle.</p>`;
+  const W = 520, H = 170, padL = 4, padR = 4, padT = 10, padB = 22;
+  const ys = curve.map((c) => c.bankroll), lo = Math.min(start, ...ys), hi = Math.max(start, ...ys);
+  const span = Math.max(hi - lo, start * 0.02), top = (hi + lo) / 2 + span * 0.58;
+  const x = (i) => padL + (i * (W - padL - padR)) / (curve.length - 1);
+  const y = (v) => padT + ((top - v) * (H - padT - padB)) / (span * 1.16);
+  const pts = curve.map((c, i) => `${x(i).toFixed(1)},${y(c.bankroll).toFixed(1)}`);
+  const base = y(start).toFixed(1);
+  const area = `M${x(0)},${base} L${pts.join(" L")} L${x(curve.length - 1)},${base} Z`;
+  const first = day(curve[0].date, { month: "short", day: "numeric" });
+  const last = day(curve[curve.length - 1].date, { month: "short", day: "numeric" });
+  return `
+  <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Paper bankroll from ${esc(first)} to ${esc(last)}, compared with the ${money(start)} start">
+    <defs>
+      <clipPath id="above"><rect x="0" y="0" width="${W}" height="${base}"/></clipPath>
+      <clipPath id="below"><rect x="0" y="${base}" width="${W}" height="${H}"/></clipPath>
+    </defs>
+    <path d="${area}" fill="var(--win-fill)" clip-path="url(#above)"/>
+    <path d="${area}" fill="var(--loss-fill)" clip-path="url(#below)"/>
+    <line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 4"/>
+    <polyline points="${pts.join(" ")}" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${x(curve.length - 1)}" cy="${y(ys[ys.length - 1])}" r="4" fill="var(--ink)"/>
+    <text class="axis" x="${padL}" y="${H - 4}">${esc(first)}</text>
+    <text class="axis" x="${W - padR}" y="${H - 4}" text-anchor="end">${esc(last)}</text>
+    <text class="axis" x="${padL}" y="${Number(base) - 6}">${money(start)} start</text>
+  </svg>`;
+}
+
+function pickRow(p) {
+  const o = outcome(p);
+  const right = o
+    ? `<span class="${tone(Number(p.pnl))}">${money(p.pnl, true)}</span><small>${o}</small>`
+    : `${money(p.stake)}<small>at ${price(p.dk_price)}</small>`;
+  return `<div class="row"><span class="who">${esc(p.player)}</span><span class="amt">${right}</span>
+    <span class="what">${esc(bet(p))}${o ? ` at ${price(p.dk_price)}` : ""}</span></div>`;
+}
+
+function parlayBlock(p) {
+  const o = outcome(p);
+  const right = o ? `<span class="${tone(Number(p.pnl))}">${o} ${money(p.pnl, true)}</span>`
+                  : `<span>${money(p.stake)}</span>`;
+  const legs = p.legs.map((l) => `<li>${esc(l.player)}, ${esc(bet(l))}${l.result ? ` <span class="${l.result === "win" ? "win" : l.result === "loss" ? "loss" : "muted"}">(${outcome(l).toLowerCase()})</span>` : ""}</li>`).join("");
+  return `<div class="parlay"><div class="head"><span>${esc(TIER[p.tier] || p.tier)} at ${price(p.dk_price)}</span>${right}</div><ul>${legs}</ul></div>`;
+}
+
+function verdict(k) {
+  if (!k || !k.verdict) return "";
+  const clv = k.avg_clv == null ? "" : ` Average CLV ${pct(k.avg_clv)}.`;
+  const text = {
+    "too early": [`Too early to judge`, `${k.picks} picks over ${k.weeks} weeks so far. The first verdict comes after 150 picks over 3 weeks.${clv}`],
+    "keep going": [`Keep going`, `The picks aren’t losing to the closing lines.${clv}`],
+    "STOP": [`Stop`, `${esc(k.reason)}.${clv} The model isn’t beating DraftKings’ closing lines.`],
+  }[k.verdict] || [esc(k.verdict), esc(k.reason)];
+  return `<h2>Is the model working?</h2><p class="verdict${k.verdict === "STOP" ? " stop" : ""}"><b>${text[0]}</b>${text[1]}</p>`;
+}
+
+function render(d) {
+  const app = document.getElementById("app");
+  if (!d) { app.innerHTML = `<p>No data yet: this page is filled in when the pipeline publishes it.</p>`; return; }
+  const today = d.days.find((x) => x.date === d.today);
+  const tonight = today ? today.picks.filter((p) => !p.result) : [];
+  const tonightPar = today ? today.parlays.filter((p) => !p.result) : [];
+  const past = d.days.filter((x) => x.picks.some((p) => p.result) || x.parlays.some((p) => p.result));
+  const s = d.singles, rec = `${s.win}–${s.loss}${s.push ? `–${s.push}` : ""}`;
+  const tiers = Object.entries(d.parlays).map(([t, v]) =>
+    `<div><b class="${tone(v.pnl)}">${money(v.pnl, true)}</b><span>${esc(TIER[t] || t)} ${v.won}–${v.lost}</span></div>`).join("");
+  app.innerHTML = `
+    <p class="kicker">Paper bankroll, as if every recommended bet had been placed</p>
+    <p class="big">${money(d.bankroll)}</p>
+    <p class="delta ${tone(d.profit)}">${money(d.profit, true)} since ${esc(day(d.start.date, { month: "short", day: "numeric" }))}</p>
+    <div class="flow">${flowChart(d.curve, d.start.bankroll)}</div>
+    <div class="line">
+      <div><b>${rec}</b><span>singles</span></div>
+      <div><b class="${tone(d.roi)}">${pct(d.roi)}</b><span>return on ${money(d.staked)}</span></div>
+      <div><b class="${tone(d.avg_clv)}">${pct(d.avg_clv)}</b><span>average CLV</span></div>
+      ${tiers}
+    </div>
+    <h2>Tonight</h2>
+    ${tonight.length || tonightPar.length
+      ? `<p class="note">${tonight.length} bet${tonight.length === 1 ? "" : "s"}${tonightPar.length ? ` and ${tonightPar.length} parlay${tonightPar.length === 1 ? "" : "s"}` : ""}, staked at DraftKings’ price when flagged.</p>` + tonight.map(pickRow).join("") + tonightPar.map(parlayBlock).join("")
+      : `<p class="note">No open bets right now. Picks are made at 10 AM, 3 PM and before each game.</p>`}
+    <h2>Results</h2>
+    ${past.length ? past.map((x) => {
+      const settled = x.picks.filter((p) => p.result);
+      const w = settled.filter((p) => p.result === "win").length, l = settled.filter((p) => p.result === "loss").length;
+      return `<details><summary><span class="d">${esc(day(x.date))}</span><span class="rec num">${w}–${l}</span><span class="p ${tone(x.pnl)}">${money(x.pnl, true)}</span></summary>
+        <div class="inner">${settled.map(pickRow).join("")}${x.parlays.filter((p) => p.result).map(parlayBlock).join("")}</div></details>`;
+    }).join("") : `<p class="note">Results appear the morning after the first games.</p>`}
+    ${verdict(d.kill)}
+    <footer>Paper money only: no real bets are behind these numbers. Updated ${esc(d.updated)}.</footer>`;
+}
+render(DATA);
+</script>
+</body>
+</html>
