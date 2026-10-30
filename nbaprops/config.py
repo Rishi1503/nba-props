@@ -53,6 +53,9 @@ class StrategyConfig(BaseModel):
     # alt-rung correction for points/PRA favored overs (make backtest-rungs writes it only
     # when its out-of-sample check passes); relative paths are from the repository root
     rung_calibration: str | None = "config/rung_calibration.json"
+    # picks are recorded only this close to tip-off (minutes); earlier finds are a watchlist
+    # in the candidate log. 0 records at any time.
+    record_window_min: int = Field(120, ge=0)
 
     @model_validator(mode="after")
     def _caps_are_ordered(self) -> "StrategyConfig":

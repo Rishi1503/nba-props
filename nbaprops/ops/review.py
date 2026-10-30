@@ -35,7 +35,7 @@ def load_settled(session, start: date, end: date, mode: str = "paper") -> pd.Dat
     """Settled picks on games from `start` to `end` (boost-only legs excluded)."""
     df = pd.read_sql_query(
         text("""
-        SELECT p.*, g.game_date, op.open_line FROM picks p JOIN games g USING (game_id)
+        SELECT p.*, g.game_date, g.tip_time, op.open_line FROM picks p JOIN games g USING (game_id)
         LEFT JOIN LATERAL (
             SELECT o.line AS open_line FROM odds_snapshots o
             WHERE o.game_id = p.game_id AND o.player_id = p.player_id AND o.market = p.market
@@ -56,6 +56,11 @@ def load_settled(session, start: date, end: date, mode: str = "paper") -> pd.Dat
         taken = df["price_placed"].fillna(df["dk_price"]).astype(int)
         df["decimal"] = [to_decimal(x) for x in taken]
         df["role"] = [_role(c) for c in df["context"]]
+        lead = (
+            pd.to_datetime(df["tip_time"], utc=True) - pd.to_datetime(df["flagged_ts"], utc=True)
+        ).dt.total_seconds() / 60
+        # the record rule from 2026-10-30: picks made within 2 hours of tip-off
+        df["timing"] = np.where(lead <= 120, "within 2h of tip", "earlier in the day")
         move = df["line"] - df["open_line"].astype(float)
         df["line_move"] = np.select(
             [df["open_line"].isna(), move >= 1, move <= -1],
@@ -214,6 +219,7 @@ def weekly_review(session, end: date, mode: str = "paper") -> dict:
             "by_side_line_move": _split(df.assign(k=df["side"] + ", " + df["line_move"]), "k")
             if len(df)
             else {},
+            "by_timing": _split(df, "timing") if len(df) else {},
         }
     rep["parlays"] = parlay_summary(session, season_start(end), end, mode)
     rep["slippage"] = slippage(session, season_start(end), end)
@@ -288,6 +294,9 @@ def render(rep: dict) -> str:
             clv = "n/a" if s.get("avg_clv") is None else f"{s['avg_clv']:+.2%}"
             out.append(f"  EV {b}: predicted {s['predicted_ev']:+.1%}, realized CLV {clv}")
     sr = rep["season_splits"]
+    for key in ("within 2h of tip", "earlier in the day"):
+        if key in sr.get("by_timing", {}):
+            out.append("  picks made " + line(key, sr["by_timing"][key]))
     for key in ("under, key teammate out", "under, no key absence"):
         if key in sr.get("by_side_role", {}):
             out.append("  " + line(key, sr["by_side_role"][key]))

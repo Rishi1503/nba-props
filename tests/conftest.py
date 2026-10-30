@@ -16,6 +16,8 @@ def _uncapped_strategy() -> str:
     tests/test_slate.py::test_the_shipped_cap_holds_back_the_synthetic_slates_big_edges."""
     cfg = yaml.safe_load(SHIPPED_STRATEGY.read_text())
     cfg["max_edge"] = 10.0
+    cfg["record_window_min"] = 0  # the slates price hours before tip-off; the window has its own
+    # tests in tests/test_watchlist.py
     path = Path(tempfile.mkdtemp(prefix="strategy-")) / "strategy.yaml"
     path.write_text(yaml.safe_dump(cfg))
     return str(path)

@@ -42,6 +42,7 @@ class SlateResult:
     run_id: str | None
     bankroll: float = 0.0
     picks: pd.DataFrame = field(default_factory=pd.DataFrame)
+    watchlist: int = 0  # flagged, but too early to record (Config.record_window_min)
     parlays: list = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     candidates: int = 0
@@ -408,6 +409,22 @@ def price_slate(
             & (cands["ev"] >= cfg.candidate_log_min_ev)
         )
         log_candidates(session, res, cands[keep], model)
+    window = int(getattr(cfg, "record_window_min", 0) or 0)
+    if window and len(cands):
+        # only games this close to tip-off can be picked; earlier finds stay in the candidate
+        # log as a watchlist, so a later, better-informed pass can still make the pick
+        tips = pd.to_datetime(games.set_index("game_id")["tip_time"], utc=True)
+        mins = (cands["game_id"].map(tips) - pd.Timestamp(as_of)).dt.total_seconds() / 60
+        early = (mins > window).fillna(False).to_numpy()
+        res.watchlist = int((early & cands["flag"].astype(bool).to_numpy()).sum())
+        if res.watchlist:
+            res.skipped.append(
+                f"{res.watchlist} pick(s) on the watchlist: recorded within {window} min of tip-off"
+            )
+        cands = cands[~early].reset_index(drop=True)
+        if cands.empty:
+            res.skipped.append(f"no games within {window} min of tip-off yet")
+            return res
     res.candidates = int(len(cands))
     if len(cands):
         thr = np.where(cands["has_consensus"].astype(bool), rules.ev_min, rules.ev_min_model_only)

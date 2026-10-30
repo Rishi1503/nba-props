@@ -398,7 +398,8 @@ def test_the_shipped_cap_holds_back_the_synthetic_slates_big_edges():
     every pick with an edge above max_edge, logs nothing as a pick, and says so on the board."""
     from tests.conftest import SHIPPED_STRATEGY
 
-    shipped = load_strategy(SHIPPED_STRATEGY)
+    # the shipped cap; its record window is tested in tests/test_watchlist.py
+    shipped = load_strategy(SHIPPED_STRATEGY).model_copy(update={"record_window_min": 0})
     seed()
     with session_scope() as s:
         uncapped = slate.price_slate(s, DAY, NOW, CFG, write=False)

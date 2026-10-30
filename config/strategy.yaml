@@ -70,3 +70,10 @@ alt_combo_max_legs: 3
 max_alt_combos_per_slate: 2
 # the alt-rung correction (written by make backtest-rungs; absent = no correction)
 rung_calibration: config/rung_calibration.json
+# Picks are recorded (and staked) only within this many minutes of tip-off: at the pre-tip
+# pass, or a pricing run already that close. The 10 AM and 3 PM runs still price every game,
+# but what they find is a watchlist (the candidate log), not a recorded pick: the record then
+# judges picks made with the latest injury news and lineups, when real bets are placed.
+# In effect from the evening of 2026-10-30; earlier picks were recorded whenever first
+# flagged (the weekly review splits the two). 0 = any time.
+record_window_min: 120

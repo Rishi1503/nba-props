@@ -426,3 +426,13 @@ def test_kill_rule_stops_when_a_big_sample_shows_no_edge():
     df = _clv_record(70, 9, -0.001, 0.05)  # 630 picks: still not positive
     k = golive.kill_check(df, date(2027, 1, 1))
     assert k["verdict"] == "STOP" and "no edge" in k["reason"]
+
+
+@pytest.mark.db
+def test_the_review_separates_picks_made_near_tip_off():
+    history()
+    with session_scope() as s:
+        rep = review.weekly_review(s, TODAY)
+    timing = rep["season_splits"]["by_timing"]
+    assert set(timing) <= {"within 2h of tip", "earlier in the day"} and timing
+    assert sum(v["bets"] for v in timing.values()) == rep["season"]["bets"]
