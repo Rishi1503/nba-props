@@ -54,6 +54,7 @@ class Deps:
     full_snapshot: Callable | None = None  # (now) -> None: every game's odds, before pricing
     pretip_games: Callable | None = None  # (session, now) -> game ids due their pre-tip pass
     mark_pretip: Callable | None = None  # (session, game_ids, now): those passes are done
+    lineups: Callable | None = None  # (session, now, notifier) -> confirmed-starter changes
 
 
 @dataclass
@@ -150,6 +151,8 @@ def run_cycle(session_factory, now: datetime, deps: Deps, notifier: alerts.Notif
         return r
 
     step("settle", _settle)
+    if deps.lineups:  # every cycle: starters appear about 30 minutes before tip-off
+        step("lineups", lambda: _with(session_factory, lambda s: deps.lineups(s, now, notifier)))
 
     def _price_and_alert(label: str):
         with session_factory() as s:
@@ -410,6 +413,7 @@ def real_deps(provider, cfg) -> Deps:
     from nbaprops.db.base import session_scope
     from nbaprops.ops import bundles
     from nbaprops.ops.settle import settle
+    from nbaprops.pipeline import lineups
     from nbaprops.pipeline.run import odds_snapshot, tick
     from nbaprops.pricing import slate
 
@@ -440,6 +444,7 @@ def real_deps(provider, cfg) -> Deps:
         full_snapshot=lambda now: odds_snapshot(provider, now),
         pretip_games=pretip_games_in,
         mark_pretip=mark_pretip_in,
+        lineups=lambda s, now, notifier: lineups.check(s, now, notifier),
         pricing_due=lambda now: _with(session_scope, lambda s: pricing_due_in(s, now)),
         settle=settle,
         project=project,

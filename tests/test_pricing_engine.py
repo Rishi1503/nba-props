@@ -659,3 +659,41 @@ def test_points_rungs_use_the_alt_rung_correction_and_the_band_checks_the_priced
     other = replace(RULES, rung_curves=(("reb", (0.5, 0.7, 1.0), (0.5, 0.8, 1.0)),))
     same = engine.milestone_candidates(_grids(), _ms_board(), other).iloc[0]
     assert same["p_fair"] == pytest.approx(base["p_fair"])  # no curve for points: unchanged
+
+
+def test_assist_overs_are_corrected_for_every_pick():
+    """2024-25 tail check: assist overs ran ~1.1 points high on both sides of every line."""
+    from dataclasses import replace
+
+    m = pd.DataFrame(
+        {
+            "market": ["ast", "pts"],
+            "p_over": [0.60, 0.60],
+            "p_under": [0.38, 0.38],
+            "p_push": [0.02, 0.02],
+            "p_over_in": [0.70, 0.70],
+            "p_under_in": [0.30, 0.30],
+        }
+    )
+    out = engine.shift_overs(m, RULES)
+    assert out.loc[0, "p_over"] == pytest.approx(0.588) and out.loc[0, "p_under"] == pytest.approx(
+        0.392
+    )
+    assert out.loc[0, "p_over_in"] == pytest.approx(0.688)  # Questionable scenarios too
+    assert out.loc[1, "p_over"] == 0.60  # other stats untouched
+    assert (out["p_over"] + out["p_under"] + out["p_push"]).round(9).tolist() == [1.0, 1.0]
+    off = engine.shift_overs(m, replace(RULES, over_shift=()))
+    assert off.equals(m)
+    edge = pd.DataFrame({"market": ["ast"], "p_over": [0.005], "p_under": [0.995]})
+    assert engine.shift_overs(edge, RULES).loc[0, "p_over"] == 0.0  # never below zero
+
+
+def test_assist_alt_rungs_get_the_same_correction():
+    from dataclasses import replace
+
+    grids = _grids().assign(market="ast")
+    board = _ms_board().assign(market="ast")
+    base = engine.milestone_candidates(grids, board, replace(RULES, over_shift=())).iloc[0]
+    fixed = engine.milestone_candidates(grids, board, RULES).iloc[0]
+    assert fixed["p_fair"] == pytest.approx(base["p_fair"] - 0.012)
+    assert fixed["p_model"] == pytest.approx(base["p_model"] - 0.012)

@@ -58,7 +58,7 @@ class Rules:
     stake_standard_flags: bool = True  # config default is False (high-confidence singles)
     questionable_teammates: str = "robust"  # robust | mixture | block (see strategy.yaml)
     alt_combo_markets: tuple = ("reb", "fg3m", "ast")
-    alt_combo_shade: tuple = (("ast", 0.015),)  # (market, probability shaved off) pairs
+    alt_combo_shade: tuple = ()  # (market, probability shaved off) pairs, alt-parlay legs only
     alt_combo_p_min: float = 0.65
     alt_combo_decimal_min: float = 1.8
     alt_combo_decimal_max: float = 2.6
@@ -66,6 +66,9 @@ class Rules:
     max_alt_combos_per_slate: int = 2
     # (market, xs, ys) curves correcting favored-over probabilities of alt rungs only
     rung_curves: tuple = ()
+    # (market, shift) added to the model's chance of the over (the under moves the other way):
+    # the 2024-25 tail check had assist overs about 1.1 points high on both sides of every line
+    over_shift: tuple = (("ast", -0.012),)
 
     @classmethod
     def from_config(cls, cfg) -> "Rules":
@@ -75,6 +78,8 @@ class Rules:
             vals["alt_combo_markets"] = tuple(vals["alt_combo_markets"])
         if "alt_combo_shade" in vals:
             vals["alt_combo_shade"] = tuple(sorted(dict(vals["alt_combo_shade"]).items()))
+        if "over_shift" in vals:
+            vals["over_shift"] = tuple(sorted(dict(vals["over_shift"]).items()))
         return cls(**vals)
 
 
@@ -139,10 +144,35 @@ SCENARIO_COLUMNS = [
 ]
 
 
+def shift_overs(m: pd.DataFrame, rules: Rules) -> pd.DataFrame:
+    """Rules.over_shift: move the model's chance of the over by a measured amount per market
+    (and the under the other way, so over + under + push still sums to one)."""
+    if not rules.over_shift or "market" not in m:
+        return m
+    m = m.copy()
+    for market, d in rules.over_shift:
+        mask = (m["market"] == market).to_numpy()
+        if not mask.any():
+            continue
+        for tag in ("", "_in", "_out"):
+            o, u = f"p_over{tag}", f"p_under{tag}"
+            if o in m and u in m:
+                po = m.loc[mask, o].astype(float)
+                pu = m.loc[mask, u].astype(float)
+                moved = np.clip(po + d, 0.0, (po + pu).to_numpy()) - po  # stays within the pair
+                m.loc[mask, o] = po + moved
+                m.loc[mask, u] = pu - moved
+    return m
+
+
+def _over_shift(rules: Rules, market: str) -> float:
+    return dict(rules.over_shift).get(market, 0.0)
+
+
 def decide(m: pd.DataFrame, rules: Rules) -> pd.DataFrame:
     """The flag decision for two-way props, from DECISION_COLUMNS (+ SCENARIO_COLUMNS for
     teammates of a key Questionable player). Shared by live pricing and paper-data tuning."""
-    m = m.reset_index(drop=True)
+    m = shift_overs(m.reset_index(drop=True), rules)
     if "p_push" not in m:
         m = m.assign(p_push=0.0)
     has_cons = m["p_over_cons"].notna().to_numpy()
@@ -341,15 +371,18 @@ def milestone_candidates(grids: pd.DataFrame, board: pd.DataFrame, rules: Rules)
         if np.isnan(p_model) or np.isnan(shifted_tail(grid, q.line, shift=shift)):
             continue
 
+        sh = _over_shift(rules, q.market)
+
         def fair_from(
-            g: dict, anchor=anchor, shift=shift, d=d, line=q.line, market=q.market
+            g: dict, anchor=anchor, shift=shift, d=d, line=q.line, market=q.market, sh=sh
         ) -> float:
             if anchor:
-                return _rung_fix(curves, market, shifted_tail(g, line, shift=shift))
-            fixed = _rung_fix(curves, market, shifted_tail(g, line))
+                p = _rung_fix(curves, market, shifted_tail(g, line, shift=shift))
+                return float(np.clip(p + sh, 0.0, 1.0))
+            fixed = float(np.clip(_rung_fix(curves, market, shifted_tail(g, line)) + sh, 0, 1))
             return shrink_toward(fixed, 1 / d, rules.model_only_shrink)
 
-        p_model = _rung_fix(curves, q.market, p_model)
+        p_model = float(np.clip(_rung_fix(curves, q.market, p_model) + sh, 0.0, 1.0))
 
         p_fair = fair_from(grid)
         thr = rules.ev_min if anchor else rules.ev_min_model_only

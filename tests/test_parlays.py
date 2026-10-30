@@ -211,7 +211,13 @@ def test_alt_combo_legs_only_from_validated_stats_inside_the_band():
     ]
     assert float(pool.set_index("player_id").loc[1, "line"]) == 5.5  # one rung per player
     ast = pool.set_index("player_id").loc[3]
-    assert ast["p_leg"] == pytest.approx(0.74 - 0.015)  # assists shaded down
+    assert ast["p_leg"] == pytest.approx(0.74)  # assists are corrected upstream (over_shift)
+    from dataclasses import replace
+
+    extra = parlays.alt_combo_pool(
+        _alt_cands(), replace(Rules(), alt_combo_shade=(("ast", 0.015),))
+    )
+    assert extra.set_index("player_id").loc[3, "p_leg"] == pytest.approx(0.74 - 0.015)
 
 
 def test_alt_combos_pay_about_even_money_from_different_games():

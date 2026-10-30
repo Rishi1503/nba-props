@@ -54,11 +54,15 @@ markets: [pts, reb, ast, fg3m, pra]
 # DraftKings "N+" rungs from different games, paying about -125 to +160. Legs only from the
 # stats whose 55-95% probabilities passed the 2024-25 tail check, plus points and PRA, whose
 # favored rungs the model underrates: priced with the alt-rung correction when
-# rung_calibration exists (make backtest-rungs), conservatively without it. Assists shaded
-# down 1.5 points (they ran slightly high). Each leg needs the model at
-# alt_combo_p_min..milestone_p_max and a shaded edge over the EV floor.
+# rung_calibration exists (make backtest-rungs), conservatively without it. Assists get the
+# over_shift correction below, like every pick. Each leg needs the model at
+# alt_combo_p_min..milestone_p_max and an edge over the EV floor.
 alt_combo_markets: [pts, reb, fg3m, ast, pra]
-alt_combo_shade: {ast: 0.015}
+alt_combo_shade: {}
+# Measured miscalibration, corrected for every pick: added to the model's chance of the over
+# (the under moves the other way). 2024-25 tail check: assist overs came in about 1.0 point
+# below prediction and assist unders about 1.2 above, on lines across each distribution.
+over_shift: {ast: -0.012}
 alt_combo_p_min: 0.65
 alt_combo_decimal_min: 1.8
 alt_combo_decimal_max: 2.6

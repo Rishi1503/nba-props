@@ -226,7 +226,7 @@ def test_real_wiring_collects_settles_projects_and_prices(monkeypatch, tmp_path)
     now = POLL + timedelta(hours=4)  # 10:00 AM New York: a pricing run
     rep = cycle.run_cycle(session_scope, now, cycle.real_deps(FakeProvider(), cfg), rec)
     assert not rep.errors, rep.errors
-    assert rep.actions == ["odds", "settle", "project", "price", "health"]
+    assert rep.actions == ["odds", "settle", "lineups", "project", "price", "health"]
     # champion, then shadow; a pricing run projects only games that haven't tipped
     assert [b for b, _, _ in projected] == ["r1", "shadow-1"]
     assert all(sorted(ids) == sorted([G1, G3]) for _, ids, _ in projected)

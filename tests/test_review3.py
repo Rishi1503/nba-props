@@ -274,35 +274,40 @@ def test_stage8_commands_are_documented():
 
 
 def test_the_schedule_covers_every_pricing_run_and_closing_window():
-    """For every tip time from noon to 11 PM New York, in daylight and standard time, some
-    scheduled run lands in the 35 minutes before tip (closing lines); and the 10 AM, 3 PM and
-    6 PM pricing runs exist in both."""
+    """The outside schedule (infra/schedule.yaml, New York time): the 10 AM, 3 PM and 6 PM
+    pricing runs every day, and a run in the 35 minutes before every tip-off (closing lines):
+    evenings every day, afternoons on weekends, when the NBA plays early games."""
     import yaml
 
+    sched = yaml.safe_load((ROOT / "infra/schedule.yaml").read_text())
+    assert sched["timezone"] == "America/New_York"
     wf = yaml.safe_load((ROOT / ".github/workflows/collect.yml").read_text())
-    crons = [c["cron"] for c in wf[True]["schedule"]]
+    inputs = wf[True]["workflow_dispatch"]["inputs"]["command"]["description"]
+    assert {j["command"] for j in sched["jobs"]} <= set(inputs.replace(" ", "").split("|"))
 
-    def values(field: str, hi: int) -> list[int]:
+    def values(field: str, lo: int, hi: int) -> list[int]:
         if field == "*":
-            return list(range(hi + 1))
-        if field.startswith("*/"):
-            return list(range(0, hi + 1, int(field[2:])))
+            return list(range(lo, hi + 1))
         out = []
         for part in field.split(","):
             a, _, b = part.partition("-")
             out += range(int(a), int(b or a) + 1)
         return out
 
-    runs = {
-        h * 60 + m
-        for c in crons
-        for h in values(c.split()[1], 23)
-        for m in values(c.split()[0], 59)
-    }
-    for utc_offset in (4, 5):  # EDT, EST
+    def runs_on(dow: int) -> set[int]:  # cron day of week: 0 Sunday ... 6 Saturday
+        return {
+            h * 60 + m
+            for j in sched["jobs"]
+            if j["command"] == "cycle" and dow in values(j["cron"].split()[4], 0, 6)
+            for h in values(j["cron"].split()[1], 0, 23)
+            for m in values(j["cron"].split()[0], 0, 59)
+        }
+
+    for dow in range(7):
+        runs = runs_on(dow)
         for et in (10, 15, 18):
-            assert ((et + utc_offset) % 24) * 60 in runs, (utc_offset, et)
-        for tip in range(12 * 60, 23 * 60 + 1, 5):
-            tip_utc = (tip + utc_offset * 60) % 1440
-            assert any(0 < (tip_utc - r) % 1440 <= 35 for r in runs), (utc_offset, divmod(tip, 60))
-    assert len(runs) <= 50  # minutes budget: every run bills at least one minute
+            assert et * 60 in runs, (dow, et)
+        first_tip = 12 * 60 if dow in (0, 6) else 18 * 60
+        for tip in range(first_tip, 23 * 60 + 1, 5):
+            assert any(0 < tip - r <= 35 for r in runs), (dow, divmod(tip, 60))
+        assert len(runs) <= 30  # minutes budget: every run bills at least one minute

@@ -42,7 +42,9 @@ class StrategyConfig(BaseModel):
     # Alt-line parlays (a paper experiment): 2-3 DraftKings "N+" rungs from different games
     # near +100, on the stats whose 55-95% probabilities passed the 2024-25 tail check.
     alt_combo_markets: list[Market] = ["reb", "fg3m", "ast"]
-    alt_combo_shade: dict[Market, float] = {"ast": 0.015}  # assists ran ~1.5 points high
+    alt_combo_shade: dict[Market, float] = {}  # extra shading for alt-parlay legs only
+    # added to the model's chance of the over, per market, for every pick (see strategy.yaml)
+    over_shift: dict[Market, float] = {"ast": -0.012}
     alt_combo_p_min: float = Field(0.65, ge=0.0, le=1.0)
     alt_combo_decimal_min: float = Field(1.8, gt=1.0)
     alt_combo_decimal_max: float = Field(2.6, gt=1.0)

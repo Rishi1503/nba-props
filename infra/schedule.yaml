@@ -1,0 +1,11 @@
+# The outside schedule that triggers .github/workflows/collect.yml (cron-job.org jobs, each a
+# POST to the workflow's dispatches endpoint). Times are New York time. Keep this file in step
+# with the cron-job.org jobs: tests/test_review3.py checks it covers every pricing run and puts
+# a run within 35 minutes before every tip-off (closing lines). Weekday afternoon tip-offs
+# (holidays) are not covered; add a weekday afternoon job before Christmas and MLK Day.
+timezone: America/New_York
+jobs:
+  - {name: morning setup, cron: "5 9 * * *", command: daily}
+  - {name: pricing, cron: "0 10,15 * * *", command: cycle}
+  - {name: evening, cron: "0,30 17-23 * * *", command: cycle}
+  - {name: weekend afternoon, cron: "0,30 11-16 * * 0,6", command: cycle}

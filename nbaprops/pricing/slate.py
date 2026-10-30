@@ -378,6 +378,26 @@ def price_slate(
     if len(model):
         model = model.assign(game_date=model["game_id"].map(gd))
     cands = engine.build_candidates(model, grids, board, rules)
+    if len(cands):
+        # confirmed starters differ from the player's usual role: his projection is stale
+        from nbaprops.pipeline import lineups
+
+        moved = lineups.changed_players(session, game_date)
+        if moved:
+            hit = np.array(
+                [
+                    (g, int(p)) in moved
+                    for g, p in zip(cands["game_id"], cands["player_id"], strict=True)
+                ],
+                dtype=bool,
+            )
+            flagged = cands["flag"].astype(bool).to_numpy()
+            if "held_back" not in cands:
+                cands["held_back"] = False
+            cands.loc[hit & flagged, "held_back"] = True
+            cands.loc[hit, "flag"] = False
+            if (hit & flagged).any():
+                res.skipped.append(f"{int((hit & flagged).sum())} pick(s) held back: lineup change")
     off = disabled_markets(session)
     if off and len(cands):
         res.skipped.append(f"markets switched off: {', '.join(sorted(off))}")
