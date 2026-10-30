@@ -30,6 +30,8 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    outputs:
+      site_changed: ${{ steps.site.outputs.changed }}
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       PROPLINE_API_KEY: ${{ secrets.PROPLINE_API_KEY }}
@@ -76,7 +78,8 @@ jobs:
             uv run python -m nbaprops.ops.run cycle
           fi
       - name: Keep raw responses
-        if: always() && hashFiles('data/raw/**') != ''
+        # only while the repository is private: a public repo's artifacts are downloadable
+        if: always() && hashFiles('data/raw/**') != '' && github.event.repository.private
         uses: actions/upload-artifact@v4
         with:
           name: raw-${{ github.run_id }}
@@ -97,3 +100,36 @@ jobs:
       - name: Publish the bankroll page
         if: always() && env.CLOUDFLARE_API_TOKEN != ''
         run: bash infra/pages/publish.sh || echo "::warning::bankroll page not published"
+      - name: Build the bankroll page (GitHub Pages)
+        id: site
+        if: always() && !github.event.repository.private
+        run: |
+          if ! uv run python -m nbaprops.site.build --out site/dist; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "::warning::bankroll page not built"; exit 0
+          fi
+          live=$(curl -fsS "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/hash.txt" 2>/dev/null || true)
+          if [ "$(cat site/dist/hash.txt)" = "$live" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "bankroll page unchanged"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload the bankroll page
+        if: always() && steps.site.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  # Deploys the page only when its data changed (new picks, results or verdict).
+  pages:
+    needs: collect
+    if: always() && needs.collect.outputs.site_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
