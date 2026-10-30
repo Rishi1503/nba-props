@@ -1,19 +1,21 @@
 name: Production cycle (odds, settlement, projections, pricing)
 
-# GitHub bills every job as at least one minute, and private repositories get 2,000 free
-# minutes a month, so the schedule only runs when there is something to do. The code decides
-# what to do from New York time, so none of this needs editing when the clocks change.
-#   14:00, 15:00, 19:00, 20:00 UTC  the 10 AM and 3 PM pricing runs (EDT and EST)
-#   :20 and :50, 15-20 UTC          noon and afternoon games: closing lines (35-min window)
-#   every 15 min, 21:00-03:45 UTC   the evening: 6 PM pricing, late news, most tip-offs
-# (A public repository has unlimited minutes: then "*/15 14-23" and "*/15 0-3" is simplest.)
+# Triggered from outside by cron-job.org through workflow_dispatch: GitHub's own scheduler
+# dropped most evening runs (4 of ~28 on Oct 27). Private repositories get 2,000 free minutes
+# a month and every job bills at least one, so the outside schedule (New York time) is:
+#   9:05 daily: command "daily" (players, schedule, stats, settlement)
+#   10:00 and 15:00: the pricing runs
+#   :00 and :30, 5 PM-11:30 PM: 6 PM pricing, late news, pre-tip passes, closing lines
+#     (captured within 35 minutes of tip-off, so every 30 minutes keeps them)
+#   :00 and :30, 11 AM-4:30 PM, Saturdays and Sundays: weekend afternoon games
+# To fall back to GitHub's scheduler, restore these under "on:":
+#   schedule:
+#     - cron: "0 14,15,19,20 * * *"
+#     - cron: "20,50 15-20 * * *"
+#     - cron: "*/15 21-23 * * *"
+#     - cron: "*/15 0-3 * * *"
+#     - cron: "5 13 * * *"
 on:
-  schedule:
-    - cron: "0 14,15,19,20 * * *"
-    - cron: "20,50 15-20 * * *"
-    - cron: "*/15 21-23 * * *"
-    - cron: "*/15 0-3 * * *"
-    - cron: "5 13 * * *" # daily schedule + roster refresh, 9:05 AM EDT / 8:05 AM EST
   workflow_dispatch:
     inputs:
       command:
