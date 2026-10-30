@@ -82,10 +82,20 @@ def match_event(session: Session, provider: str, event: EventInfo) -> str | None
 
 
 def _resolve_player(session: Session, q: PropQuote) -> int | None:
+    """The quote's player id. Each player is ensured or looked up once per session (one odds
+    snapshot): the same ~300 players repeat across ~5,500 props, and two database round
+    trips per prop made a full snapshot take ~20 minutes, past GitHub's time limit."""
     if q.nba_player_id is not None:
-        ensure_player(session, q.nba_player_id, q.player_name_raw)
+        ensured = session.info.setdefault("ensured_players", set())
+        key = (q.nba_player_id, (q.player_name_raw or "").strip())
+        if key not in ensured:
+            ensure_player(session, q.nba_player_id, q.player_name_raw)
+            ensured.add(key)
         return q.nba_player_id
-    return resolve_player_by_name(session, q.player_name_raw)
+    names = session.info.setdefault("resolved_names", {})
+    if q.player_name_raw not in names:
+        names[q.player_name_raw] = resolve_player_by_name(session, q.player_name_raw)
+    return names[q.player_name_raw]
 
 
 def _prop_key(book: str, pkey: str, market: str, line_type: str, line: float) -> tuple:
