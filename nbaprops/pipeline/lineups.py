@@ -28,7 +28,8 @@ ET = ZoneInfo("America/New_York")
 BOXSCORE_URL = "https://cdn.nba.com/static/json/liveData/boxscore/boxscore_{}.json"
 WINDOW = timedelta(minutes=60)  # check games tipping within the hour
 MIN_GAMES = 3  # history needed before a start or a benching counts as a change
-HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.nba.com/"}
+# the schedule loader's headers: the NBA's CDN turns away bare clients
+from nbaprops.pipeline.schedule import _HEADERS as HEADERS  # noqa: E402
 
 
 def _yes(v) -> bool:
